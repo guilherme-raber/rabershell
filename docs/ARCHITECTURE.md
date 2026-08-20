@@ -22,12 +22,16 @@ Isso impede que handlers manipulem widgets e permite reaproveitar a sessão em u
 
 ### GUI
 
-`TerminalWindow` cria saída rolável, prompt, entrada e histórico em memória. Comandos comuns são
-enviados a um executor sequencial. Comandos marcados como controle no registry usam um executor
-dedicado; hoje apenas `cancelar` tem essa marca. A conclusão volta à thread principal com
-`Tk.after`, e somente essa thread altera widgets. A entrada permanece disponível durante operações
-longas para que o cancelamento não fique atrás do sweep na fila, sem tornar os demais comandos
-concorrentes entre si.
+`TerminalWindow` usa um único widget `Text` para banner, histórico visual, saída, prompt e digitação.
+Marcas identificam o início do prompt e da linha editável; eventos de teclado alteram apenas um
+`TerminalInputModel`, e a GUI renderiza novamente somente a região posterior ao prompt. O conteúdo
+anterior continua selecionável e copiável, mas não pode ser editado.
+
+Comandos comuns são enviados a um executor sequencial. Comandos marcados como controle no registry
+usam um executor dedicado; hoje apenas `cancelar` tem essa marca. Workers depositam resultados em
+uma fila, verificada periodicamente pela thread do tkinter. Ao receber saída assíncrona, a GUI remove
+temporariamente o prompt ativo, insere a saída e restaura o prompt e o texto ainda em edição. Isso
+evita acesso ao tkinter por workers e mistura entre resultado e entrada durante operações longas.
 
 ### Parser e sessão
 
@@ -46,6 +50,10 @@ na sessão resolve:
 3. sugestão por similaridade quando não há correspondência.
 
 O mesmo `CommandSpec` e handler de ping é visível em `root` e `icmp`; não há duplicação.
+
+`ShellSession.complete` consulta os nomes visíveis do registry. Ele completa comandos e aliases do
+contexto atual e reconhece o segundo token de formas explícitas como `icmp sw`. A GUI apenas aplica
+o resultado ou apresenta múltiplas correspondências; argumentos não são completados.
 
 ### Commands, core e engines
 
@@ -71,5 +79,6 @@ plataforma. A sessão aceita somente um sweep ativo, guarda seu `threading.Event
 - dispatcher permanece junto da sessão enquanto for pequeno;
 - saída nativa do ping é preservada nesta versão, sem parser frágil por idioma do SO;
 - todos os comandos passam pelo executor da GUI, simplificando a garantia de responsividade;
+- histórico e edição da linha atual são modelados sem dependência de widgets, facilitando testes;
 - sweep aceita no máximo 4.096 endereços (`/20`) e não enfileira a rede inteira no executor;
 - versão existe somente em `rabershell.__version__` e o pacote a lê dinamicamente.

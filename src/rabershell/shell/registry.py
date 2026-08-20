@@ -63,6 +63,9 @@ class CommandRegistry:
             names.update(self._contexts)
         return tuple(sorted(names))
 
+    def completion_names(self, context: str) -> tuple[str, ...]:
+        return self.suggestion_names(context)
+
     @staticmethod
     def _unique(commands: Iterable[CommandSpec]) -> Iterable[CommandSpec]:
         seen: set[tuple[str, str]] = set()

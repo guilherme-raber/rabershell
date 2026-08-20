@@ -45,6 +45,11 @@ comando global `cancelar`; a GUI deve continuar aceitando esse comando durante a
 Comandos que precisam ultrapassar a fila sequencial devem ser explicitamente marcados como controle
 no `CommandSpec`; não aumente indiscriminadamente a concorrência do executor principal.
 
+A GUI usa uma única superfície `Text`. Todo conteúdo anterior ao prompt ativo é histórico protegido;
+somente o modelo da linha atual pode produzir edições. Autocomplete consulta a sessão/registry, e
+resultados de workers atravessam uma fila consumida pela thread do tkinter. Não atualize widgets a
+partir de threads de execução nem recrie listas paralelas de comandos na camada gráfica.
+
 Para adicionar comando: implemente handler pequeno, reutilize/crie engine quando houver operação,
 registre um único `CommandSpec`, teste resolução/argumentos/erros e atualize `COMMANDS.md`. Para
 adicionar contexto: registre descrição, comandos contextuais, navegação necessária e testes do

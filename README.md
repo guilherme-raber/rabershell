@@ -16,7 +16,7 @@ ferramenta para conseguir usá-la.
 - contexto ICMP e `ping` real para IPv4 ou hostname;
 - sweep ICMP concorrente e cancelável para redes IPv4 de até `/20`;
 - `ping` direto, explícito (`icmp ping`) ou dentro do contexto ICMP;
-- GUI tkinter responsiva, histórico com ↑/↓, rolagem e limpeza;
+- terminal tkinter integrado e responsivo, com histórico protegido, ↑/↓ e autocomplete por Tab;
 - backend de sistema isolado e execução sem `shell=True`.
 
 ```text
@@ -29,6 +29,11 @@ raber> icmp
 raber/icmp> ping 127.0.0.1
 raber/icmp> voltar
 ```
+
+O prompt, a digitação e a saída compartilham a mesma superfície visual. Use `Tab` para completar
+comandos e aliases, inclusive `icmp <subcomando>`. `Home`, `End`, setas, Backspace e Delete atuam
+somente na linha atual; texto anterior permanece selecionável e pode ser copiado com `Ctrl+C`.
+`Ctrl+V` cola na linha ativa e transforma quebras de linha em espaços, sem executar automaticamente.
 
 ## Requisitos e instalação
 

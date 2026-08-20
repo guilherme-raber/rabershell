@@ -30,6 +30,19 @@ fonte executável dos mesmos metadados.
 Os comandos globais `limpar`, `versao`, `cancelar` e `sair`, com seus aliases, também permanecem
 disponíveis.
 
+## Interação no terminal
+
+- `Enter` executa a linha; em uma linha vazia, apenas cria um novo prompt.
+- `↑` e `↓` percorrem o histórico de comandos da sessão.
+- `Home` e `End` movem para o início e o fim do comando atual.
+- `Backspace` e `Delete` não atravessam o início da entrada nem alteram o histórico visual.
+- `Tab` completa comandos, aliases, contextos e subcomandos explícitos pelo registry.
+- Múltiplas correspondências são exibidas sem escolha arbitrária; a linha atual é restaurada.
+- `Ctrl+C` copia a seleção. `Ctrl+V` cola somente na linha ativa e converte quebras em espaços.
+
+Durante operações em background, o prompt permanece disponível. Resultados são inseridos antes do
+prompt ativo sem destruir o texto digitado, e `cancelar` continua disponível durante um sweep.
+
 ## Formas equivalentes de ping
 
 ```text

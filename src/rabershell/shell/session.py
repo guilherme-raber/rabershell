@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import os.path
 import threading
 
 from rabershell.core.ping import (
@@ -15,7 +16,7 @@ from rabershell.core.sweep import (
     NetworkTooLargeError,
     SweepEngine,
 )
-from rabershell.shell.models import CommandResult, CommandRuntime, CommandSpec
+from rabershell.shell.models import CompletionResult, CommandResult, CommandRuntime, CommandSpec
 from rabershell.shell.parser import ParseError, parse_line
 from rabershell.shell.registry import CommandRegistry
 
@@ -80,6 +81,39 @@ class ShellSession(CommandRuntime):
             return False
         command = self.registry.resolve(tokens[0], self.current_context)
         return command is not None and command.control_command
+
+    def complete(self, line: str) -> CompletionResult:
+        trailing_space = bool(line) and line[-1].isspace()
+        tokens = line.split()
+        partial = "" if trailing_space else (tokens[-1] if tokens else "")
+
+        completion_context: str | None = None
+        if self.current_context != "root":
+            if len(tokens) <= 1 and not trailing_space:
+                completion_context = self.current_context
+            elif not tokens:
+                completion_context = self.current_context
+        elif len(tokens) <= 1 and not trailing_space:
+            completion_context = "root"
+        elif len(tokens) == 1 and trailing_space and self.registry.is_context(tokens[0]):
+            completion_context = tokens[0]
+        elif len(tokens) == 2 and not trailing_space and self.registry.is_context(tokens[0]):
+            completion_context = tokens[0]
+
+        if completion_context is None:
+            return CompletionResult(line)
+
+        matches = tuple(
+            name
+            for name in self.registry.completion_names(completion_context)
+            if name.startswith(partial)
+        )
+        if not matches:
+            return CompletionResult(line)
+
+        replacement = matches[0] if len(matches) == 1 else os.path.commonprefix(matches)
+        completed_line = line[: len(line) - len(partial)] + replacement
+        return CompletionResult(completed_line, matches)
 
     def _unknown(self, name: str, context: str) -> CommandResult:
         suggestions = difflib.get_close_matches(

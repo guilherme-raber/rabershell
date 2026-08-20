@@ -34,6 +34,11 @@ mypy
 Abrir a GUI requer ambiente gráfico. Os testes do núcleo não realizam ping ou sweep reais; use
 backends falsos para testar concorrência, limites e cancelamento de forma determinística.
 
+A edição da linha fica em `gui/input_model.py` para permitir testes sem display. Autocomplete é
+responsabilidade da sessão e do registry, não do widget. Mudanças no terminal devem testar limites
+de edição, histórico, paste e conclusão sem depender de rede; faça também smoke test visual quando
+houver ambiente gráfico.
+
 ## Estrutura
 
 - `src/rabershell/shell`: linguagem interna, catálogo resolvido e estado da sessão;

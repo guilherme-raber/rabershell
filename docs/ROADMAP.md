@@ -8,7 +8,7 @@ O roadmap registra intenção, não compromisso de prazo.
 - shell, sessão, registry, aliases, ajuda e sugestões;
 - contexto ICMP e ping direto/contextual com backend de sistema;
 - sweep ICMP concorrente, cancelável e limitado a redes IPv4 de até `/20`;
-- GUI responsiva com histórico em memória;
+- terminal gráfico integrado com histórico protegido, edição de linha e autocomplete contextual;
 - testes do núcleo, lint, formatação, tipos e documentação.
 
 ## Próximo

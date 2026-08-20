@@ -19,6 +19,12 @@ class CommandResult:
     is_error: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class CompletionResult:
+    line: str
+    matches: tuple[str, ...] = ()
+
+
 class CommandRuntime(Protocol):
     @property
     def current_context(self) -> str: ...
