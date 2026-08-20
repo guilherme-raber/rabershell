@@ -7,7 +7,7 @@ from tkinter import font as tkfont
 
 from rabershell import __version__
 from rabershell.gui.input_model import TerminalInputModel
-from rabershell.shell.models import CommandResult, ResultAction
+from rabershell.shell.models import CommandEvent, CommandEventType, CommandResult, ResultAction
 from rabershell.shell.session import ShellSession
 
 
@@ -18,7 +18,7 @@ class TerminalWindow:
         self._control_executor = ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="rabershell-control"
         )
-        self._results: queue.SimpleQueue[CommandResult] = queue.SimpleQueue()
+        self._results: queue.SimpleQueue[CommandEvent] = queue.SimpleQueue()
         self._input = TerminalInputModel()
         self._closing = False
 
@@ -142,30 +142,43 @@ class TerminalWindow:
             if self._session.is_control_command(command)
             else self._executor
         )
-        future = executor.submit(self._session.execute, command)
+        future = executor.submit(self._session.execute_events, command, self._results.put)
         future.add_done_callback(self._command_finished)
 
-    def _command_finished(self, future: Future[CommandResult]) -> None:
+    def _command_finished(self, future: Future[None]) -> None:
         if self._closing:
             return
         try:
-            result = future.result()
+            future.result()
         except Exception as exc:  # boundary: impede que falhas encerrem a GUI
-            result = CommandResult(f"Erro interno inesperado: {exc}", is_error=True)
-        self._results.put(result)
+            self._results.put(CommandEvent.error(f"Erro interno inesperado: {exc}\n"))
 
     def _drain_results(self) -> None:
         if self._closing:
             return
         while True:
             try:
-                result = self._results.get_nowait()
+                event = self._results.get_nowait()
             except queue.Empty:
                 break
-            self._apply_result(result)
+            self._apply_event(event)
             if self._closing:
                 return
         self._root.after(50, self._drain_results)
+
+    def _apply_event(self, event: CommandEvent) -> None:
+        if event.type in {CommandEventType.OUTPUT, CommandEventType.ERROR}:
+            self._apply_output(event.text)
+            return
+        if event.result is not None:
+            self._apply_result(event.result)
+
+    def _apply_output(self, text: str) -> None:
+        if not text:
+            return
+        self._remove_active_prompt()
+        self._terminal.insert("end", text)
+        self._show_prompt()
 
     def _apply_result(self, result: CommandResult) -> None:
         self._remove_active_prompt()

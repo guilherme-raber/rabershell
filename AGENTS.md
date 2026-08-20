@@ -50,6 +50,11 @@ somente o modelo da linha atual pode produzir edições. Autocomplete consulta a
 resultados de workers atravessam uma fila consumida pela thread do tkinter. Não atualize widgets a
 partir de threads de execução nem recrie listas paralelas de comandos na camada gráfica.
 
+Comandos com saída incremental devem emitir `CommandEvent` pelo callback recebido na execução. A
+ordem é zero ou mais eventos `OUTPUT` seguidos de um único `COMPLETED`; `CommandResult` continua
+sendo o resultado final estruturado. Backends não conhecem a GUI, e stdout já emitido não deve ser
+repetido no resultado final. Teste streaming com streams bloqueantes e sem rede real.
+
 Para adicionar comando: implemente handler pequeno, reutilize/crie engine quando houver operação,
 registre um único `CommandSpec`, teste resolução/argumentos/erros e atualize `COMMANDS.md`. Para
 adicionar contexto: registre descrição, comandos contextuais, navegação necessária e testes do

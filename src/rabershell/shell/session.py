@@ -16,7 +16,14 @@ from rabershell.core.sweep import (
     NetworkTooLargeError,
     SweepEngine,
 )
-from rabershell.shell.models import CompletionResult, CommandResult, CommandRuntime, CommandSpec
+from rabershell.shell.models import (
+    CommandEvent,
+    CompletionResult,
+    CommandResult,
+    CommandRuntime,
+    CommandSpec,
+    EventSink,
+)
 from rabershell.shell.parser import ParseError, parse_line
 from rabershell.shell.registry import CommandRegistry
 
@@ -50,7 +57,7 @@ class ShellSession(CommandRuntime):
     def leave_context(self) -> None:
         self._current_context = "root"
 
-    def execute(self, line: str) -> CommandResult:
+    def execute(self, line: str, event_sink: EventSink | None = None) -> CommandResult:
         try:
             tokens = parse_line(line)
         except ParseError as exc:
@@ -70,7 +77,11 @@ class ShellSession(CommandRuntime):
         if command is None:
             return self._unknown(command_name, self.current_context)
 
-        return command.handler(self, args)
+        return command.handler(self, args, event_sink)
+
+    def execute_events(self, line: str, event_sink: EventSink) -> None:
+        result = self.execute(line, event_sink)
+        event_sink(CommandEvent.completed(result))
 
     def is_control_command(self, line: str) -> bool:
         try:
@@ -150,13 +161,20 @@ class ShellSession(CommandRuntime):
             "Exemplo:\n  ajuda ping"
         )
 
-    def run_ping(self, args: tuple[str, ...]) -> CommandResult:
+    def run_ping(
+        self, args: tuple[str, ...], event_sink: EventSink | None = None
+    ) -> CommandResult:
         parsed = self._parse_ping_arguments(args)
         if isinstance(parsed, CommandResult):
             return parsed
         destination, count = parsed
         try:
-            report = self.ping_engine.execute(destination, count)
+            on_output = (
+                (lambda text: event_sink(CommandEvent.output(text)))
+                if event_sink is not None
+                else None
+            )
+            report = self.ping_engine.execute(destination, count, on_output=on_output)
         except (InvalidDestinationError, HostResolutionError) as exc:
             return CommandResult(str(exc), is_error=True)
         except (PingToolUnavailableError, PingExecutionTimeoutError) as exc:
@@ -166,6 +184,11 @@ class ShellSession(CommandRuntime):
             if report.successful
             else f'Não houve resposta bem-sucedida de "{report.destination}".'
         )
+        if event_sink is not None:
+            return CommandResult(
+                "" if report.successful else heading,
+                is_error=not report.successful,
+            )
         output = report.output or "A ferramenta ping não produziu saída."
         return CommandResult(f"{heading}\n\n{output}", is_error=not report.successful)
 

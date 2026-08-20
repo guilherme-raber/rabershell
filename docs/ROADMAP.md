@@ -7,6 +7,7 @@ O roadmap registra intenção, não compromisso de prazo.
 - pacote Python com entry points gráfico e console instalado;
 - shell, sessão, registry, aliases, ajuda e sugestões;
 - contexto ICMP e ping direto/contextual com backend de sistema;
+- output incremental do ping por eventos de execução reutilizáveis;
 - sweep ICMP concorrente, cancelável e limitado a redes IPv4 de até `/20`;
 - terminal gráfico integrado com histórico protegido, edição de linha e autocomplete contextual;
 - testes do núcleo, lint, formatação, tipos e documentação.

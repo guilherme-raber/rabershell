@@ -14,6 +14,7 @@ ferramenta para conseguir usá-la.
 
 - shell próprio, contextos, aliases e sugestões de comandos;
 - contexto ICMP e `ping` real para IPv4 ou hostname;
+- saída do `ping` apresentada incrementalmente enquanto o processo está em execução;
 - sweep ICMP concorrente e cancelável para redes IPv4 de até `/20`;
 - `ping` direto, explícito (`icmp ping`) ou dentro do contexto ICMP;
 - terminal tkinter integrado e responsivo, com histórico protegido, ↑/↓ e autocomplete por Tab;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from rabershell.core.validation import is_ipv4, is_valid_destination
@@ -31,7 +32,12 @@ class PingEngine:
     def __init__(self, backend: PingBackend) -> None:
         self._backend = backend
 
-    def execute(self, destination: str, count: int) -> PingReport:
+    def execute(
+        self,
+        destination: str,
+        count: int,
+        on_output: Callable[[str], None] | None = None,
+    ) -> PingReport:
         if not is_valid_destination(destination):
             raise InvalidDestinationError(
                 "Destino inválido. Informe um endereço IPv4 ou hostname válido."
@@ -43,7 +49,7 @@ class PingEngine:
                 raise HostResolutionError(
                     f'Não foi possível resolver o hostname "{destination}".'
                 ) from exc
-        result = self._backend.ping(destination, count)
+        result = self._backend.ping(destination, count, on_output=on_output)
         return PingReport(destination, count, result.successful, result.output)
 
 

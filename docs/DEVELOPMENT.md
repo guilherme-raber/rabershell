@@ -39,6 +39,11 @@ responsabilidade da sessão e do registry, não do widget. Mudanças no terminal
 de edição, histórico, paste e conclusão sem depender de rede; faça também smoke test visual quando
 houver ambiente gráfico.
 
+Streaming usa `CommandEvent` e um callback explícito até o backend. Testes devem usar processo e
+stream falsos, incluindo um stream bloqueante que prove que o primeiro `OUTPUT` chega antes da
+conclusão. Verifique ordem, evento final, códigos não zero, falha de inicialização e ausência de
+duplicação; nunca dependa de um host público.
+
 ## Estrutura
 
 - `src/rabershell/shell`: linguagem interna, catálogo resolvido e estado da sessão;

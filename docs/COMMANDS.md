@@ -43,6 +43,10 @@ disponíveis.
 Durante operações em background, o prompt permanece disponível. Resultados são inseridos antes do
 prompt ativo sem destruir o texto digitado, e `cancelar` continua disponível durante um sweep.
 
+O `ping` apresenta cada linha conforme `ping.exe` ou a ferramenta equivalente a produz. Ao final,
+o stdout não é repetido. Erros de validação ou de inicialização continuam aparecendo como mensagens
+estruturadas. O `sweep` permanece com resumo somente ao final.
+
 ## Formas equivalentes de ping
 
 ```text

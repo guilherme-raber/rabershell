@@ -1,12 +1,14 @@
 import pytest
 
 from rabershell.commands.catalog import build_registry
-from rabershell.shell.models import CommandResult, CommandSpec
+from rabershell.shell.models import CommandResult, CommandSpec, EventSink
 from rabershell.shell.registry import CommandRegistry
 
 
-def _noop(runtime: object, args: tuple[str, ...]) -> CommandResult:
-    del runtime, args
+def _noop(
+    runtime: object, args: tuple[str, ...], event_sink: EventSink | None
+) -> CommandResult:
+    del runtime, args, event_sink
     return CommandResult()
 
 

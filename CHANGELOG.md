@@ -15,3 +15,4 @@ baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o proje
 - Sweep ICMP concorrente e cancelável para redes IPv4 CIDR de até 4.096 endereços.
 - Superfície única de terminal com histórico protegido, autocomplete contextual e edição da linha
   ativa.
+- Infraestrutura reutilizável de eventos de execução e output incremental em tempo real para ping.
