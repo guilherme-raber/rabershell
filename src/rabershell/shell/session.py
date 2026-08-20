@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+import difflib
+from rabershell.core.ping import (
+    HostResolutionError,
+    InvalidDestinationError,
+    PingEngine,
+    PingExecutionTimeoutError,
+    PingToolUnavailableError,
+)
+from rabershell.shell.models import CommandResult, CommandRuntime, CommandSpec
+from rabershell.shell.parser import ParseError, parse_line
+from rabershell.shell.registry import CommandRegistry
+
+
+class ShellSession(CommandRuntime):
+    def __init__(self, registry: CommandRegistry, ping_engine: PingEngine) -> None:
+        self.registry = registry
+        self.ping_engine = ping_engine
+        self._current_context = "root"
+
+    @property
+    def current_context(self) -> str:
+        return self._current_context
+
+    @property
+    def prompt(self) -> str:
+        suffix = "" if self.current_context == "root" else f"/{self.current_context}"
+        return f"raber{suffix}>"
+
+    def enter_context(self, name: str) -> str:
+        if not self.registry.is_context(name):
+            raise ValueError(f"Contexto desconhecido: {name}")
+        self._current_context = name
+        return self.registry.context_description(name)
+
+    def leave_context(self) -> None:
+        self._current_context = "root"
+
+    def execute(self, line: str) -> CommandResult:
+        try:
+            tokens = parse_line(line)
+        except ParseError as exc:
+            return CommandResult(str(exc), is_error=True)
+        if not tokens:
+            return CommandResult()
+
+        command_name, args = tokens[0], tokens[1:]
+        command: CommandSpec | None
+        if self.current_context == "root" and self.registry.is_context(command_name) and args:
+            command = self.registry.resolve_in_context(args[0], command_name)
+            if command is None:
+                return self._unknown(args[0], command_name)
+            args = args[1:]
+        else:
+            command = self.registry.resolve(command_name, self.current_context)
+        if command is None:
+            return self._unknown(command_name, self.current_context)
+
+        return command.handler(self, args)
+
+    def _unknown(self, name: str, context: str) -> CommandResult:
+        suggestions = difflib.get_close_matches(
+            name, self.registry.suggestion_names(context), n=3, cutoff=0.6
+        )
+        text = f'Comando "{name}" não encontrado.'
+        if suggestions:
+            text += "\n\nVocê quis dizer:\n" + "\n".join(f"  {item}" for item in suggestions)
+        text += '\n\nDigite "ajuda" para visualizar os comandos disponíveis.'
+        return CommandResult(text, is_error=True)
+
+    def render_help(self, command_name: str | None = None) -> CommandResult:
+        if command_name:
+            command = self.registry.resolve(command_name, self.current_context)
+            if command is None and self.current_context == "root":
+                command = self.registry.resolve_in_context(command_name, "icmp")
+            if command is None:
+                return self._unknown(command_name, self.current_context)
+            aliases = f"\nAliases: {', '.join(command.aliases)}" if command.aliases else ""
+            examples = "\n".join(f"  {example}" for example in command.examples)
+            return CommandResult(
+                f"{command.name.upper()}\n\n{command.description}.\n\nUso:\n"
+                f"  {command.usage}{aliases}\n\nExemplos:\n{examples}"
+            )
+
+        commands = self.registry.visible_commands(self.current_context)
+        width = max(len(command.usage) for command in commands)
+        rows = "\n".join(
+            f"  {command.usage:<{width}}  {command.description}" for command in commands
+        )
+        return CommandResult(
+            "Comandos disponíveis:\n\n"
+            f"{rows}\n\nDigite \"ajuda <comando>\" para mais informações.\n\n"
+            "Exemplo:\n  ajuda ping"
+        )
+
+    def run_ping(self, args: tuple[str, ...]) -> CommandResult:
+        parsed = self._parse_ping_arguments(args)
+        if isinstance(parsed, CommandResult):
+            return parsed
+        destination, count = parsed
+        try:
+            report = self.ping_engine.execute(destination, count)
+        except (InvalidDestinationError, HostResolutionError) as exc:
+            return CommandResult(str(exc), is_error=True)
+        except (PingToolUnavailableError, PingExecutionTimeoutError) as exc:
+            return CommandResult(f"Não foi possível executar o ping: {exc}", is_error=True)
+        heading = (
+            f'Ping para "{report.destination}" concluído.'
+            if report.successful
+            else f'Não houve resposta bem-sucedida de "{report.destination}".'
+        )
+        output = report.output or "A ferramenta ping não produziu saída."
+        return CommandResult(f"{heading}\n\n{output}", is_error=not report.successful)
+
+    @staticmethod
+    def _parse_ping_arguments(args: tuple[str, ...]) -> tuple[str, int] | CommandResult:
+        usage = "Uso: ping <destino> [--quantidade N]"
+        if not args:
+            return CommandResult(f"Destino obrigatório.\n\n{usage}", is_error=True)
+        destination = args[0]
+        count = 4
+        remaining = list(args[1:])
+        if remaining:
+            if len(remaining) != 2 or remaining[0] not in {"--quantidade", "--count"}:
+                return CommandResult(usage, is_error=True)
+            try:
+                count = int(remaining[1])
+            except ValueError:
+                return CommandResult(
+                    "A quantidade deve ser um número inteiro entre 1 e 20.", is_error=True
+                )
+            if not 1 <= count <= 20:
+                return CommandResult("A quantidade deve estar entre 1 e 20.", is_error=True)
+        return destination, count
