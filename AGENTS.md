@@ -39,6 +39,12 @@ para o mesmo objeto; nunca crie handlers duplicados. Um comando de contexto pode
 `root_exposed=True`. Assim, o único `ping` atende `ping HOST`, `icmp ping HOST` e, após `icmp`,
 `ping HOST`. Contextos pertencem à `ShellSession`, não à GUI.
 
+Operações longas devem oferecer cancelamento cooperativo quando aplicável. O `sweep` mantém no
+máximo uma execução ativa por sessão, usa uma janela limitada de probes concorrentes e responde ao
+comando global `cancelar`; a GUI deve continuar aceitando esse comando durante a operação.
+Comandos que precisam ultrapassar a fila sequencial devem ser explicitamente marcados como controle
+no `CommandSpec`; não aumente indiscriminadamente a concorrência do executor principal.
+
 Para adicionar comando: implemente handler pequeno, reutilize/crie engine quando houver operação,
 registre um único `CommandSpec`, teste resolução/argumentos/erros e atualize `COMMANDS.md`. Para
 adicionar contexto: registre descrição, comandos contextuais, navegação necessária e testes do
@@ -83,4 +89,3 @@ Textos visíveis são pt-BR e devem ficar em handlers/metadados ou camada de apr
 backends. Atualize README, changelog e docs quando o comportamento mudar. `COMMANDS.md` deve
 catalogar somente o que existe; itens futuros ficam claramente em `ROADMAP.md`. Não mantenha listas
 paralelas de ajuda no código. Comentários explicam decisões, não repetem o código.
-

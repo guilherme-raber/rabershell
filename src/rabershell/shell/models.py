@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from collections.abc import Callable
 from typing import Protocol
 
 
@@ -31,6 +31,10 @@ class CommandRuntime(Protocol):
 
     def run_ping(self, args: tuple[str, ...]) -> CommandResult: ...
 
+    def run_sweep(self, args: tuple[str, ...]) -> CommandResult: ...
+
+    def cancel_active_operation(self) -> bool: ...
+
 
 CommandHandler = Callable[[CommandRuntime, tuple[str, ...]], CommandResult]
 
@@ -46,6 +50,7 @@ class CommandSpec:
     context: str = "root"
     root_exposed: bool = False
     global_command: bool = False
+    control_command: bool = False
 
     @property
     def all_names(self) -> tuple[str, ...]:

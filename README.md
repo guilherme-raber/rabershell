@@ -14,6 +14,7 @@ ferramenta para conseguir usá-la.
 
 - shell próprio, contextos, aliases e sugestões de comandos;
 - contexto ICMP e `ping` real para IPv4 ou hostname;
+- sweep ICMP concorrente e cancelável para redes IPv4 de até `/20`;
 - `ping` direto, explícito (`icmp ping`) ou dentro do contexto ICMP;
 - GUI tkinter responsiva, histórico com ↑/↓, rolagem e limpeza;
 - backend de sistema isolado e execução sem `shell=True`.
@@ -22,6 +23,8 @@ ferramenta para conseguir usá-la.
 raber> ajuda
 raber> ping 8.8.8.8
 raber> icmp ping google.com --quantidade 5
+raber> sweep 192.168.1.0/24
+raber> cancelar
 raber> icmp
 raber/icmp> ping 127.0.0.1
 raber/icmp> voltar
@@ -74,4 +77,3 @@ explícita para testes. O projeto é destinado a diagnóstico, troubleshooting e
 ## Licença
 
 Distribuído sob a licença [MIT](LICENSE).
-

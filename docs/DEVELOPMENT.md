@@ -31,7 +31,8 @@ ruff format --check .
 mypy
 ```
 
-Abrir a GUI requer ambiente gráfico. Os testes do núcleo não realizam ping real.
+Abrir a GUI requer ambiente gráfico. Os testes do núcleo não realizam ping ou sweep reais; use
+backends falsos para testar concorrência, limites e cancelamento de forma determinística.
 
 ## Estrutura
 
@@ -52,4 +53,3 @@ plataforma isoladas. Nunca faça testes dependerem de rede pública.
 
 Antes do commit, formate, execute todas as validações, faça smoke test apropriado e confira se
 README, changelog, `COMMANDS.md`, `ARCHITECTURE.md` e `ROADMAP.md` refletem o comportamento real.
-

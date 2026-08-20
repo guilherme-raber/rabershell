@@ -58,3 +58,29 @@ def test_system_backend_never_uses_shell(monkeypatch: pytest.MonkeyPatch) -> Non
     assert result.successful
     assert captured["arguments"] == ["ping", "-n", "1", "127.0.0.1"]
     assert captured["shell"] is False
+
+
+def test_windows_probe_uses_single_packet_and_timeout() -> None:
+    backend = SystemPingBackend("Windows")
+    assert backend.build_probe_arguments("192.0.2.1", 1.0) == [
+        "ping",
+        "-n",
+        "1",
+        "-w",
+        "1000",
+        "192.0.2.1",
+    ]
+
+
+def test_probe_never_uses_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(arguments: list[str], **options: object) -> subprocess.CompletedProcess[bytes]:
+        captured["arguments"] = arguments
+        captured.update(options)
+        return subprocess.CompletedProcess(arguments, 0, b"", b"")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert SystemPingBackend("Windows").probe("192.0.2.1", 1.0)
+    assert captured["arguments"] == ["ping", "-n", "1", "-w", "1000", "192.0.2.1"]
+    assert captured["shell"] is False

@@ -49,3 +49,15 @@ def back_command(runtime: CommandRuntime, args: tuple[str, ...]) -> CommandResul
 
 def ping_command(runtime: CommandRuntime, args: tuple[str, ...]) -> CommandResult:
     return runtime.run_ping(args)
+
+
+def sweep_command(runtime: CommandRuntime, args: tuple[str, ...]) -> CommandResult:
+    return runtime.run_sweep(args)
+
+
+def cancel_command(runtime: CommandRuntime, args: tuple[str, ...]) -> CommandResult:
+    if args:
+        return CommandResult('O comando "cancelar" não recebe argumentos.', is_error=True)
+    if runtime.cancel_active_operation():
+        return CommandResult("Cancelamento solicitado. Aguardando probes em andamento.")
+    return CommandResult("Não há operação cancelável em andamento.")

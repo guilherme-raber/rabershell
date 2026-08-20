@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from rabershell.commands.builtins import (
     back_command,
+    cancel_command,
     clear_command,
     enter_icmp_command,
     exit_command,
     help_command,
     ping_command,
+    sweep_command,
     version_command,
 )
 from rabershell.shell.models import CommandSpec
@@ -43,6 +45,12 @@ def build_registry() -> CommandRegistry:
     )
     registry.register(
         CommandSpec(
+            "cancelar", "Cancela a operação em andamento", "cancelar", ("cancelar",),
+            cancel_command, global_command=True, control_command=True,
+        )
+    )
+    registry.register(
+        CommandSpec(
             "icmp", "Abre as ferramentas ICMP", "icmp [comando]",
             ("icmp", "icmp ping 8.8.8.8"), enter_icmp_command,
         )
@@ -52,6 +60,13 @@ def build_registry() -> CommandRegistry:
             "ping", "Testa a conectividade com um destino",
             "ping <destino> [--quantidade N]", ("ping 8.8.8.8", "ping google.com"),
             ping_command, context="icmp", root_exposed=True,
+        )
+    )
+    registry.register(
+        CommandSpec(
+            "sweep", "Verifica quais endereços de uma rede respondem a ICMP",
+            "sweep <rede-cidr>", ("sweep 192.168.1.0/24",), sweep_command,
+            context="icmp", root_exposed=True,
         )
     )
     registry.register(

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import difflib
+import threading
+
 from rabershell.core.ping import (
     HostResolutionError,
     InvalidDestinationError,
@@ -8,16 +10,26 @@ from rabershell.core.ping import (
     PingExecutionTimeoutError,
     PingToolUnavailableError,
 )
+from rabershell.core.sweep import (
+    InvalidNetworkError,
+    NetworkTooLargeError,
+    SweepEngine,
+)
 from rabershell.shell.models import CommandResult, CommandRuntime, CommandSpec
 from rabershell.shell.parser import ParseError, parse_line
 from rabershell.shell.registry import CommandRegistry
 
 
 class ShellSession(CommandRuntime):
-    def __init__(self, registry: CommandRegistry, ping_engine: PingEngine) -> None:
+    def __init__(
+        self, registry: CommandRegistry, ping_engine: PingEngine, sweep_engine: SweepEngine
+    ) -> None:
         self.registry = registry
         self.ping_engine = ping_engine
+        self.sweep_engine = sweep_engine
         self._current_context = "root"
+        self._operation_lock = threading.Lock()
+        self._active_cancel_event: threading.Event | None = None
 
     @property
     def current_context(self) -> str:
@@ -58,6 +70,16 @@ class ShellSession(CommandRuntime):
             return self._unknown(command_name, self.current_context)
 
         return command.handler(self, args)
+
+    def is_control_command(self, line: str) -> bool:
+        try:
+            tokens = parse_line(line)
+        except ParseError:
+            return False
+        if not tokens:
+            return False
+        command = self.registry.resolve(tokens[0], self.current_context)
+        return command is not None and command.control_command
 
     def _unknown(self, name: str, context: str) -> CommandResult:
         suggestions = difflib.get_close_matches(
@@ -112,6 +134,52 @@ class ShellSession(CommandRuntime):
         )
         output = report.output or "A ferramenta ping não produziu saída."
         return CommandResult(f"{heading}\n\n{output}", is_error=not report.successful)
+
+    def run_sweep(self, args: tuple[str, ...]) -> CommandResult:
+        if len(args) != 1:
+            return CommandResult("Uso: sweep <rede-cidr>", is_error=True)
+
+        cancel_event = threading.Event()
+        with self._operation_lock:
+            if self._active_cancel_event is not None:
+                return CommandResult(
+                    'Já existe um sweep em andamento. Use "cancelar" ou aguarde a conclusão.',
+                    is_error=True,
+                )
+            self._active_cancel_event = cancel_event
+
+        try:
+            report = self.sweep_engine.execute(args[0], cancel_event)
+        except (InvalidNetworkError, NetworkTooLargeError) as exc:
+            return CommandResult(str(exc), is_error=True)
+        except PingToolUnavailableError as exc:
+            return CommandResult(f"Não foi possível executar o sweep: {exc}", is_error=True)
+        finally:
+            with self._operation_lock:
+                if self._active_cancel_event is cancel_event:
+                    self._active_cancel_event = None
+
+        status = "cancelado" if report.cancelled else "concluído"
+        hosts = (
+            "\n".join(f"  {host}" for host in report.responsive_hosts)
+            if report.responsive_hosts
+            else "  Nenhum endereço respondeu."
+        )
+        return CommandResult(
+            f"Sweep {status}.\n\n"
+            f"Rede: {report.network}\n"
+            f"Verificados: {report.checked_hosts}/{report.total_hosts}\n"
+            f"Responderam: {len(report.responsive_hosts)}\n"
+            f"Duração: {report.elapsed_seconds:.2f} s\n\n"
+            f"Endereços responsivos:\n{hosts}"
+        )
+
+    def cancel_active_operation(self) -> bool:
+        with self._operation_lock:
+            if self._active_cancel_event is None:
+                return False
+            self._active_cancel_event.set()
+            return True
 
     @staticmethod
     def _parse_ping_arguments(args: tuple[str, ...]) -> tuple[str, int] | CommandResult:

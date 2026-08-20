@@ -13,6 +13,9 @@ class TerminalWindow:
     def __init__(self, session: ShellSession) -> None:
         self._session = session
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="rabershell")
+        self._control_executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="rabershell-control"
+        )
         self._closing = False
         self._history: list[str] = []
         self._history_index = 0
@@ -66,9 +69,12 @@ class TerminalWindow:
         self._history.append(line)
         self._history_index = len(self._history)
         self._write(f"\n{self._session.prompt} {line}\n")
-        self._entry.configure(state="disabled")
-        future = self._executor.submit(self._session.execute, line)
+        executor = (
+            self._control_executor if self._session.is_control_command(line) else self._executor
+        )
+        future = executor.submit(self._session.execute, line)
         future.add_done_callback(self._command_finished)
+        self._entry.focus_set()
         return "break"
 
     def _command_finished(self, future: Future[CommandResult]) -> None:
@@ -93,7 +99,6 @@ class TerminalWindow:
             self._close()
             return
         self._refresh_prompt()
-        self._entry.configure(state="normal")
         self._entry.focus_set()
 
     def _write(self, text: str) -> None:
@@ -130,5 +135,7 @@ class TerminalWindow:
         if self._closing:
             return
         self._closing = True
+        self._session.cancel_active_operation()
         self._executor.shutdown(wait=False, cancel_futures=True)
+        self._control_executor.shutdown(wait=False, cancel_futures=True)
         self._root.destroy()
