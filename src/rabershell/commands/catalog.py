@@ -64,9 +64,9 @@ def build_registry() -> CommandRegistry:
     )
     registry.register(
         CommandSpec(
-            "sweep", "Verifica quais endereços de uma rede respondem a ICMP",
-            "sweep <rede-cidr>", ("sweep 192.168.1.0/24",), sweep_command,
-            context="icmp", root_exposed=True,
+            "varredura", "Verifica quais endereços de uma rede respondem a ICMP",
+            "varredura <rede-cidr>", ("varredura 192.168.1.0/24",), sweep_command,
+            aliases=("sweep",), context="icmp", root_exposed=True,
         )
     )
     registry.register(

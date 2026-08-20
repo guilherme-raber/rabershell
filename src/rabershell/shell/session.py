@@ -192,44 +192,70 @@ class ShellSession(CommandRuntime):
         output = report.output or "A ferramenta ping não produziu saída."
         return CommandResult(f"{heading}\n\n{output}", is_error=not report.successful)
 
-    def run_sweep(self, args: tuple[str, ...]) -> CommandResult:
+    def run_sweep(
+        self, args: tuple[str, ...], event_sink: EventSink | None = None
+    ) -> CommandResult:
         if len(args) != 1:
-            return CommandResult("Uso: sweep <rede-cidr>", is_error=True)
+            return CommandResult("Uso: varredura <rede-cidr>", is_error=True)
 
         cancel_event = threading.Event()
         with self._operation_lock:
             if self._active_cancel_event is not None:
                 return CommandResult(
-                    'Já existe um sweep em andamento. Use "cancelar" ou aguarde a conclusão.',
+                    'Já existe uma varredura em andamento. Use "cancelar" ou aguarde a conclusão.',
                     is_error=True,
                 )
             self._active_cancel_event = cancel_event
 
         try:
-            report = self.sweep_engine.execute(args[0], cancel_event)
+            on_started = (
+                lambda network, total: event_sink(
+                    CommandEvent.output(
+                        f"Iniciando varredura de {network}...\n"
+                        f"Verificando {total} endereços...\n\n"
+                    )
+                )
+                if event_sink is not None
+                else None
+            )
+            on_responsive = (
+                lambda host: event_sink(CommandEvent.output(f"{host:<16} respondeu\n"))
+                if event_sink is not None
+                else None
+            )
+            report = self.sweep_engine.execute(
+                args[0],
+                cancel_event,
+                on_started=on_started,
+                on_responsive=on_responsive,
+            )
         except (InvalidNetworkError, NetworkTooLargeError) as exc:
             return CommandResult(str(exc), is_error=True)
         except PingToolUnavailableError as exc:
-            return CommandResult(f"Não foi possível executar o sweep: {exc}", is_error=True)
+            return CommandResult(f"Não foi possível executar a varredura: {exc}", is_error=True)
         finally:
             with self._operation_lock:
                 if self._active_cancel_event is cancel_event:
                     self._active_cancel_event = None
 
-        status = "cancelado" if report.cancelled else "concluído"
-        hosts = (
-            "\n".join(f"  {host}" for host in report.responsive_hosts)
-            if report.responsive_hosts
-            else "  Nenhum endereço respondeu."
-        )
-        return CommandResult(
-            f"Sweep {status}.\n\n"
-            f"Rede: {report.network}\n"
+        status = "cancelada" if report.cancelled else "concluída"
+        responsive_count = len(report.responsive_hosts)
+        duration = f"{report.elapsed_seconds:.2f}".replace(".", ",")
+        summary = (
+            f"Varredura {status}.\n\n"
+            f"Rede:        {report.network}\n"
             f"Verificados: {report.checked_hosts}/{report.total_hosts}\n"
-            f"Responderam: {len(report.responsive_hosts)}\n"
-            f"Duração: {report.elapsed_seconds:.2f} s\n\n"
-            f"Endereços responsivos:\n{hosts}"
+            f"Responsivos: {responsive_count}\n"
+            f"Duração:     {duration} s"
         )
+        if responsive_count == 0:
+            summary += "\n\nNenhum endereço respondeu."
+        if event_sink is not None:
+            return CommandResult(summary)
+        if responsive_count == 0:
+            return CommandResult(summary)
+        hosts = "\n".join(f"  {host}" for host in report.responsive_hosts)
+        return CommandResult(f"{summary}\n\nEndereços responsivos:\n{hosts}")
 
     def cancel_active_operation(self) -> bool:
         with self._operation_lock:

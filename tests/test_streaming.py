@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import tkinter as tk
 
 import pytest
@@ -73,6 +74,48 @@ def test_nonzero_ping_completes_with_friendly_error(
     assert completed.is_error
     assert "Não houve resposta" in completed.text
     assert "tempo esgotado" not in completed.text
+
+
+def test_varredura_outputs_host_before_completion_and_does_not_duplicate_it(
+    session: ShellSession, backend: FakePingBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    release = threading.Event()
+    host_output = threading.Event()
+    events: list[CommandEvent] = []
+
+    def controlled_probe(destination: str, timeout_seconds: float) -> bool:
+        del timeout_seconds
+        if destination == "192.0.2.1":
+            return True
+        release.wait(timeout=1)
+        return False
+
+    def receive(event: CommandEvent) -> None:
+        events.append(event)
+        if event.type is CommandEventType.OUTPUT and "192.0.2.1" in event.text:
+            host_output.set()
+
+    monkeypatch.setattr(backend, "probe", controlled_probe)
+    worker = threading.Thread(
+        target=lambda: session.execute_events("varredura 192.0.2.0/29", receive)
+    )
+    worker.start()
+    assert host_output.wait(timeout=1)
+    assert worker.is_alive()
+    assert all(event.type is not CommandEventType.COMPLETED for event in events)
+    release.set()
+    worker.join(timeout=2)
+
+    assert not worker.is_alive()
+    output = "".join(event.text for event in events if event.type is CommandEventType.OUTPUT)
+    completed = events[-1]
+    assert "Iniciando varredura de 192.0.2.0/29" in output
+    assert output.count("192.0.2.1") == 1
+    assert completed.type is CommandEventType.COMPLETED
+    assert completed.result is not None
+    assert "192.0.2.1" not in completed.result.text
+    assert "Verificados: 6/6" in completed.result.text
+    assert "Responsivos: 1" in completed.result.text
 
 
 def test_terminal_queue_preserves_stream_order_and_current_input(

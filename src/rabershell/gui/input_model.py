@@ -17,9 +17,12 @@ class TerminalInputModel:
         self.text = self.text[: self.cursor] + value + self.text[self.cursor :]
         self.cursor += len(value)
 
-    def paste(self, value: str) -> None:
-        safe_value = value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
-        self.insert(safe_value)
+    def paste(self, value: str) -> bool:
+        non_empty_lines = [line for line in value.splitlines() if line.strip()]
+        if len(non_empty_lines) > 1:
+            return False
+        self.insert(non_empty_lines[0] if non_empty_lines else "")
+        return True
 
     def backspace(self) -> None:
         if self.cursor == 0:
@@ -75,4 +78,3 @@ class TerminalInputModel:
             else self._history[self._history_index]
         )
         self.replace(value)
-

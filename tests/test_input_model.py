@@ -47,9 +47,14 @@ def test_history_navigation_preserves_current_draft() -> None:
     assert model.text == "rascunho"
 
 
-def test_multiline_paste_becomes_one_safe_editable_line() -> None:
+def test_multiline_paste_is_rejected_without_changing_draft() -> None:
     model = TerminalInputModel()
     model.insert("ping ")
-    model.paste("1.1.1.1\r\najuda\nversao")
-    assert model.text == "ping 1.1.1.1 ajuda versao"
+    assert not model.paste("1.1.1.1\r\najuda\nversao")
+    assert model.text == "ping "
 
+
+def test_single_non_empty_line_with_empty_lines_is_accepted() -> None:
+    model = TerminalInputModel()
+    assert model.paste("\r\nping 1.1.1.1\n\n")
+    assert model.text == "ping 1.1.1.1"

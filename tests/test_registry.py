@@ -17,9 +17,13 @@ def test_ping_is_same_spec_in_root_and_icmp() -> None:
     assert registry.resolve("ping", "root") is registry.resolve("ping", "icmp")
 
 
-def test_sweep_is_same_spec_in_root_and_icmp() -> None:
+def test_varredura_and_sweep_alias_share_spec_handler_in_root_and_icmp() -> None:
     registry = build_registry()
-    assert registry.resolve("sweep", "root") is registry.resolve("sweep", "icmp")
+    canonical = registry.resolve("varredura", "root")
+    assert canonical is not None
+    assert canonical is registry.resolve("varredura", "icmp")
+    assert canonical is registry.resolve("sweep", "root")
+    assert canonical is registry.resolve("sweep", "icmp")
 
 
 def test_alias_resolves_to_same_command() -> None:

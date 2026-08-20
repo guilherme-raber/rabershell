@@ -29,7 +29,7 @@ class TerminalWindow:
         self._root.configure(bg="#101418")
         self._root.protocol("WM_DELETE_WINDOW", self._close)
 
-        mono = tkfont.Font(family="Consolas", size=11)
+        mono = tkfont.Font(root=self._root, family="Consolas", size=11)
         self._terminal = tk.Text(
             self._root,
             bg="#101418",
@@ -42,6 +42,7 @@ class TerminalWindow:
             pady=14,
             wrap="word",
             undo=False,
+            exportselection=True,
         )
         scrollbar = tk.Scrollbar(self._root, command=self._terminal.yview)
         self._terminal.configure(yscrollcommand=scrollbar.set)
@@ -67,11 +68,18 @@ class TerminalWindow:
     def _bind_terminal_events(self) -> None:
         self._terminal.bind("<KeyPress>", self._on_keypress)
         self._terminal.bind("<ButtonRelease-1>", self._on_mouse_release)
-        self._terminal.bind("<Control-v>", self._paste)
-        self._terminal.bind("<Control-V>", self._paste)
-        self._terminal.bind("<<Paste>>", self._paste)
-        self._terminal.bind("<Button-2>", self._paste)
-        self._terminal.bind("<ButtonRelease-2>", lambda event: "break")
+        self._terminal.bind("<Control-c>", self._copy_selection)
+        self._terminal.bind("<Control-C>", self._copy_selection)
+        self._terminal.bind("<Control-v>", self._paste_clipboard)
+        self._terminal.bind("<Control-V>", self._paste_clipboard)
+        self._terminal.bind("<<Paste>>", self._paste_clipboard)
+        windowing_system = str(self._root.tk.call("tk", "windowingsystem"))
+        if windowing_system == "x11":
+            self._terminal.bind("<Button-2>", self._paste_primary)
+            self._terminal.bind("<ButtonRelease-2>", lambda event: "break")
+        elif windowing_system == "win32":
+            self._terminal.bind("<Button-3>", self._paste_clipboard)
+            self._terminal.bind("<ButtonRelease-3>", lambda event: "break")
         self._terminal.bind("<Control-x>", lambda event: "break")
         self._terminal.bind("<Control-X>", lambda event: "break")
 
@@ -120,14 +128,40 @@ class TerminalWindow:
             self._input.cursor = min(len(self._input.text), int(count[0]) if count else 0)
             self._place_cursor()
 
-    def _paste(self, event: tk.Event[tk.Misc] | None = None) -> str:
+    def _copy_selection(self, event: tk.Event[tk.Misc] | None = None) -> str:
+        del event
+        try:
+            value = self._terminal.get("sel.first", "sel.last")
+        except tk.TclError:
+            return "break"
+        self._root.clipboard_clear()
+        self._root.clipboard_append(value)
+        return "break"
+
+    def _paste_clipboard(self, event: tk.Event[tk.Misc] | None = None) -> str:
         del event
         try:
             value = self._root.clipboard_get()
         except tk.TclError:
             return "break"
-        self._input.paste(value)
-        self._render_input()
+        return self._paste_value(value)
+
+    def _paste_primary(self, event: tk.Event[tk.Misc] | None = None) -> str:
+        del event
+        try:
+            value = str(self._root.tk.call("selection", "get", "-selection", "PRIMARY"))
+        except tk.TclError:
+            return "break"
+        return self._paste_value(value)
+
+    def _paste_value(self, value: str) -> str:
+        if self._input.paste(value):
+            self._render_input()
+        else:
+            self._apply_output(
+                "Colagem com múltiplas linhas não é suportada. "
+                "Cole um comando por vez.\n"
+            )
         return "break"
 
     def _submit(self) -> None:

@@ -87,3 +87,75 @@ def test_sweep_cancellation_stops_scheduling_new_hosts() -> None:
     assert len(result) == 1
     assert result[0].cancelled
     assert backend.calls <= 2
+
+
+def test_sweep_emits_responsive_hosts_in_completion_order_while_running() -> None:
+    started = {"192.0.2.1": threading.Event(), "192.0.2.2": threading.Event()}
+    release = {"192.0.2.1": threading.Event(), "192.0.2.2": threading.Event()}
+    first_output = threading.Event()
+
+    class ControlledBackend:
+        def probe(self, destination: str, timeout_seconds: float) -> bool:
+            del timeout_seconds
+            if destination in started:
+                started[destination].set()
+                release[destination].wait(timeout=1)
+            return destination in started
+
+    outputs: list[str] = []
+
+    def record(host: str) -> None:
+        outputs.append(host)
+        first_output.set()
+
+    worker = threading.Thread(
+        target=lambda: SweepEngine(ControlledBackend(), max_workers=2).execute(
+            "192.0.2.0/30", threading.Event(), on_responsive=record
+        )
+    )
+    worker.start()
+    assert started["192.0.2.1"].wait(timeout=1)
+    assert started["192.0.2.2"].wait(timeout=1)
+    release["192.0.2.2"].set()
+    assert first_output.wait(timeout=1)
+    assert worker.is_alive()
+    release["192.0.2.1"].set()
+    worker.join(timeout=2)
+
+    assert not worker.is_alive()
+    assert outputs == ["192.0.2.2", "192.0.2.1"]
+
+
+def test_sweep_never_exceeds_configured_worker_limit() -> None:
+    lock = threading.Lock()
+    release = threading.Event()
+    two_active = threading.Event()
+    active = 0
+    maximum_active = 0
+
+    class CountingBackend:
+        def probe(self, destination: str, timeout_seconds: float) -> bool:
+            nonlocal active, maximum_active
+            del destination, timeout_seconds
+            with lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+                if active == 2:
+                    two_active.set()
+            release.wait(timeout=1)
+            with lock:
+                active -= 1
+            return False
+
+    worker = threading.Thread(
+        target=lambda: SweepEngine(CountingBackend(), max_workers=2).execute(
+            "192.0.2.0/29", threading.Event()
+        )
+    )
+    worker.start()
+    assert two_active.wait(timeout=1)
+    release.set()
+    worker.join(timeout=2)
+
+    assert not worker.is_alive()
+    assert maximum_active == 2

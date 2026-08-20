@@ -16,3 +16,8 @@ baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o proje
 - Superfície única de terminal com histórico protegido, autocomplete contextual e edição da linha
   ativa.
 - Infraestrutura reutilizável de eventos de execução e output incremental em tempo real para ping.
+- `varredura` como nome canônico pt-BR do comando ICMP, preservando `sweep` como alias.
+- Cópia explícita da seleção e colagem protegida por clipboard, botão direito no Windows e seleção
+  primária pelo botão do meio no X11.
+- Output incremental de hosts responsivos durante `varredura`, sem duplicação no resumo final.
+- Rejeição segura de colagens com múltiplas linhas, preservando a entrada atual.

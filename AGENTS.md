@@ -11,6 +11,8 @@ O princípio central de UX é: **o usuário não deve precisar decorar o rabersh
 Ofereça descoberta, ajuda contextual, exemplos, defaults seguros e erros acionáveis. A interface
 do usuário é pt-BR; identificadores e código-fonte são preferencialmente em inglês. Termos técnicos
 consagrados, como ping, ICMP, DNS e TCP, permanecem em inglês.
+Quando houver termo natural e curto, o nome canônico apresentado ao usuário deve ser pt-BR;
+preserve nomes anteriores como aliases quando a compatibilidade exigir.
 
 ## Arquitetura e responsabilidades
 
@@ -39,9 +41,10 @@ para o mesmo objeto; nunca crie handlers duplicados. Um comando de contexto pode
 `root_exposed=True`. Assim, o único `ping` atende `ping HOST`, `icmp ping HOST` e, após `icmp`,
 `ping HOST`. Contextos pertencem à `ShellSession`, não à GUI.
 
-Operações longas devem oferecer cancelamento cooperativo quando aplicável. O `sweep` mantém no
-máximo uma execução ativa por sessão, usa uma janela limitada de probes concorrentes e responde ao
-comando global `cancelar`; a GUI deve continuar aceitando esse comando durante a operação.
+Operações longas devem oferecer cancelamento cooperativo quando aplicável. A `varredura` (alias
+`sweep`) mantém no máximo uma execução ativa por sessão, usa uma janela limitada de probes
+concorrentes e responde ao comando global `cancelar`; a GUI deve continuar aceitando esse comando
+durante a operação.
 Comandos que precisam ultrapassar a fila sequencial devem ser explicitamente marcados como controle
 no `CommandSpec`; não aumente indiscriminadamente a concorrência do executor principal.
 
@@ -49,11 +52,17 @@ A GUI usa uma única superfície `Text`. Todo conteúdo anterior ao prompt ativo
 somente o modelo da linha atual pode produzir edições. Autocomplete consulta a sessão/registry, e
 resultados de workers atravessam uma fila consumida pela thread do tkinter. Não atualize widgets a
 partir de threads de execução nem recrie listas paralelas de comandos na camada gráfica.
+Seleção do histórico serve apenas para cópia. Toda colagem deve passar pelo modelo da linha atual.
+Uma única linha é aceita sem execução automática; múltiplas linhas não vazias são rejeitadas por
+inteiro, preservando o rascunho. Use fontes nativas somente onde confiáveis: clipboard em todas as
+plataformas, PRIMARY com botão do meio no X11 e botão direito no Windows.
 
 Comandos com saída incremental devem emitir `CommandEvent` pelo callback recebido na execução. A
 ordem é zero ou mais eventos `OUTPUT` seguidos de um único `COMPLETED`; `CommandResult` continua
 sendo o resultado final estruturado. Backends não conhecem a GUI, e stdout já emitido não deve ser
 repetido no resultado final. Teste streaming com streams bloqueantes e sem rede real.
+Na varredura, callbacks da engine informam início e hosts responsivos ao coordenador, que os
+converte em `OUTPUT`; probes concorrentes nunca emitem eventos diretamente nem conhecem a GUI.
 
 Para adicionar comando: implemente handler pequeno, reutilize/crie engine quando houver operação,
 registre um único `CommandSpec`, teste resolução/argumentos/erros e atualize `COMMANDS.md`. Para

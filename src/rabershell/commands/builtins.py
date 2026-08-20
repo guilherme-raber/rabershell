@@ -71,8 +71,7 @@ def ping_command(
 def sweep_command(
     runtime: CommandRuntime, args: tuple[str, ...], event_sink: EventSink | None
 ) -> CommandResult:
-    del event_sink
-    return runtime.run_sweep(args)
+    return runtime.run_sweep(args, event_sink)
 
 
 def cancel_command(

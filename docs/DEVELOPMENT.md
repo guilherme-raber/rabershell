@@ -31,18 +31,25 @@ ruff format --check .
 mypy
 ```
 
-Abrir a GUI requer ambiente gráfico. Os testes do núcleo não realizam ping ou sweep reais; use
+Abrir a GUI requer ambiente gráfico. Os testes do núcleo não realizam ping ou varredura reais; use
 backends falsos para testar concorrência, limites e cancelamento de forma determinística.
 
 A edição da linha fica em `gui/input_model.py` para permitir testes sem display. Autocomplete é
 responsabilidade da sessão e do registry, não do widget. Mudanças no terminal devem testar limites
 de edição, histórico, paste e conclusão sem depender de rede; faça também smoke test visual quando
 houver ambiente gráfico.
+Teste clipboard pela fronteira do widget sem depender de pixels: seleção deve permanecer somente
+leitura, paste de uma linha deve atingir o modelo ativo e múltiplas linhas não vazias devem ser
+rejeitadas sem alterar o rascunho. PRIMARY é específico de X11 e o botão direito para paste é
+específico do Windows.
 
 Streaming usa `CommandEvent` e um callback explícito até o backend. Testes devem usar processo e
 stream falsos, incluindo um stream bloqueante que prove que o primeiro `OUTPUT` chega antes da
 conclusão. Verifique ordem, evento final, códigos não zero, falha de inicialização e ausência de
 duplicação; nunca dependa de um host público.
+Para varredura, teste callbacks com probes bloqueantes: um `OUTPUT` deve ser observável antes do
+relatório final, a ordem deve acompanhar a conclusão dos futures e o limite de workers deve ser
+preservado.
 
 ## Estrutura
 

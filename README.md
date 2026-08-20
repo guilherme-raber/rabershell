@@ -15,7 +15,8 @@ ferramenta para conseguir usá-la.
 - shell próprio, contextos, aliases e sugestões de comandos;
 - contexto ICMP e `ping` real para IPv4 ou hostname;
 - saída do `ping` apresentada incrementalmente enquanto o processo está em execução;
-- sweep ICMP concorrente e cancelável para redes IPv4 de até `/20`;
+- `varredura` ICMP concorrente, incremental e cancelável para redes IPv4 de até `/20`
+  (`sweep` é alias);
 - `ping` direto, explícito (`icmp ping`) ou dentro do contexto ICMP;
 - terminal tkinter integrado e responsivo, com histórico protegido, ↑/↓ e autocomplete por Tab;
 - backend de sistema isolado e execução sem `shell=True`.
@@ -24,7 +25,7 @@ ferramenta para conseguir usá-la.
 raber> ajuda
 raber> ping 8.8.8.8
 raber> icmp ping google.com --quantidade 5
-raber> sweep 192.168.1.0/24
+raber> varredura 192.168.1.0/24
 raber> cancelar
 raber> icmp
 raber/icmp> ping 127.0.0.1
@@ -34,7 +35,10 @@ raber/icmp> voltar
 O prompt, a digitação e a saída compartilham a mesma superfície visual. Use `Tab` para completar
 comandos e aliases, inclusive `icmp <subcomando>`. `Home`, `End`, setas, Backspace e Delete atuam
 somente na linha atual; texto anterior permanece selecionável e pode ser copiado com `Ctrl+C`.
-`Ctrl+V` cola na linha ativa e transforma quebras de linha em espaços, sem executar automaticamente.
+`Ctrl+V` cola uma linha na entrada ativa, sem executar automaticamente. Colagens com múltiplas
+linhas não vazias são rejeitadas integralmente e preservam o rascunho atual.
+No Windows, o botão direito também cola na linha ativa. No X11, o botão do meio cola a seleção
+primária; esses atalhos nunca alteram o histórico protegido.
 
 ## Requisitos e instalação
 

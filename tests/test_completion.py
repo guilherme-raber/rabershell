@@ -29,19 +29,25 @@ def test_no_completion_keeps_input_unchanged(session: ShellSession) -> None:
 
 def test_empty_root_completion_uses_visible_registry_names(session: ShellSession) -> None:
     result = session.complete("")
-    assert {"ajuda", "icmp", "ping", "sweep"} <= set(result.matches)
+    assert {"ajuda", "icmp", "ping", "varredura", "sweep"} <= set(result.matches)
 
 
 def test_contextual_completion_uses_icmp_commands(session: ShellSession) -> None:
     session.execute("icmp")
-    result = session.complete("sw")
-    assert result.line == "sweep"
-    assert result.matches == ("sweep",)
+    result = session.complete("var")
+    assert result.line == "varredura"
+    assert result.matches == ("varredura",)
 
 
 def test_explicit_context_completion_uses_subcommands(session: ShellSession) -> None:
-    result = session.complete("icmp sw")
-    assert result.line == "icmp sweep"
+    result = session.complete("icmp var")
+    assert result.line == "icmp varredura"
+    assert result.matches == ("varredura",)
+
+
+def test_sweep_alias_remains_available_for_completion(session: ShellSession) -> None:
+    result = session.complete("swe")
+    assert result.line == "sweep"
     assert result.matches == ("sweep",)
 
 
@@ -49,4 +55,3 @@ def test_arguments_are_not_completed(session: ShellSession) -> None:
     result = session.complete("ping 1.1")
     assert result.line == "ping 1.1"
     assert result.matches == ()
-

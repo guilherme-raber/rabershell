@@ -3,7 +3,7 @@ from __future__ import annotations
 import ipaddress
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 
@@ -44,9 +44,18 @@ class SweepEngine:
         self._max_workers = max_workers
         self._probe_timeout_seconds = probe_timeout_seconds
 
-    def execute(self, value: str, cancel_event: threading.Event) -> SweepReport:
+    def execute(
+        self,
+        value: str,
+        cancel_event: threading.Event,
+        *,
+        on_started: Callable[[str, int], None] | None = None,
+        on_responsive: Callable[[str], None] | None = None,
+    ) -> SweepReport:
         network = self._parse_network(value)
         hosts = tuple(str(host) for host in network.hosts())
+        if on_started is not None:
+            on_started(str(network), len(hosts))
         started_at = time.monotonic()
         responsive: list[str] = []
         checked = 0
@@ -64,6 +73,8 @@ class SweepEngine:
                     checked += 1
                     if future.result():
                         responsive.append(host)
+                        if on_responsive is not None:
+                            on_responsive(host)
                 self._fill_window(executor, pending, host_iterator, cancel_event, worker_count)
         finally:
             if cancel_event.is_set():
@@ -76,6 +87,8 @@ class SweepEngine:
                         checked += 1
                         if future.result():
                             responsive.append(host)
+                            if on_responsive is not None:
+                                on_responsive(host)
 
         responsive.sort(key=ipaddress.IPv4Address)
         return SweepReport(
@@ -114,7 +127,7 @@ class SweepEngine:
                 "Rede inválida. Informe uma rede IPv4 em formato CIDR."
             ) from exc
         if not isinstance(network, ipaddress.IPv4Network):
-            raise InvalidNetworkError("A primeira versão do sweep aceita somente redes IPv4.")
+            raise InvalidNetworkError("A varredura aceita somente redes IPv4.")
         if network.num_addresses > MAX_SWEEP_ADDRESSES:
             raise NetworkTooLargeError(
                 "Rede muito grande para esta versão. O limite é 4.096 endereços (IPv4 /20)."

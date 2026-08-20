@@ -136,7 +136,7 @@ class SystemPingBackend:
         if self._system_name == "Darwin":
             return ["ping", "-c", "1", "-W", str(timeout_milliseconds), destination]
         raise PingToolUnavailableError(
-            "O sweep ainda não possui backend para "
+            "A varredura ainda não possui backend para "
             f"{self._system_name or 'esta plataforma'}."
         )
 

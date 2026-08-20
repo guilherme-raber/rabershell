@@ -54,7 +54,16 @@ def test_icmp_help_is_contextual(session: ShellSession) -> None:
     result = session.execute("ajuda")
     assert "ping <destino>" in result.text
     assert "voltar" in result.text
-    assert "sweep <rede-cidr>" in result.text
+    assert "varredura <rede-cidr>" in result.text
+
+
+def test_varredura_help_uses_canonical_name_and_reports_alias(
+    session: ShellSession,
+) -> None:
+    result = session.execute("ajuda varredura")
+    assert result.text.startswith("VARREDURA")
+    assert "varredura <rede-cidr>" in result.text
+    assert "Aliases: sweep" in result.text
 
 
 def test_unknown_command_suggests_ping(session: ShellSession) -> None:
@@ -119,9 +128,9 @@ def test_invalid_destination_is_rejected_before_resolution(session: ShellSession
 @pytest.mark.parametrize(
     "commands",
     [
-        ("sweep 192.0.2.0/30",),
-        ("icmp sweep 192.0.2.0/30",),
-        ("icmp", "sweep 192.0.2.0/30"),
+        ("varredura 192.0.2.0/30",),
+        ("icmp varredura 192.0.2.0/30",),
+        ("icmp", "varredura 192.0.2.0/30"),
     ],
 )
 def test_all_sweep_routes_use_same_engine(
@@ -134,11 +143,19 @@ def test_all_sweep_routes_use_same_engine(
     assert {host for host, _ in backend.probe_calls} == {"192.0.2.1", "192.0.2.2"}
 
 
-def test_sweep_validates_arguments_and_safe_limit(session: ShellSession) -> None:
-    assert session.execute("sweep").is_error
-    result = session.execute("sweep 10.0.0.0/19")
+def test_varredura_validates_arguments_and_safe_limit(session: ShellSession) -> None:
+    assert session.execute("varredura").is_error
+    result = session.execute("varredura 10.0.0.0/19")
     assert result.is_error
     assert "4.096" in result.text
+
+
+def test_sweep_alias_keeps_existing_behavior(
+    session: ShellSession, backend: FakePingBackend
+) -> None:
+    result = session.execute("sweep 192.0.2.0/30")
+    assert not result.is_error
+    assert {host for host, _ in backend.probe_calls} == {"192.0.2.1", "192.0.2.2"}
 
 
 def test_cancel_without_active_operation_is_informative(session: ShellSession) -> None:
@@ -164,7 +181,7 @@ def test_cancel_command_stops_active_sweep(
     monkeypatch.setattr(backend, "probe", blocking_probe)
     results: list[CommandResult] = []
     worker = threading.Thread(
-        target=lambda: results.append(session.execute("sweep 192.0.2.0/24"))
+        target=lambda: results.append(session.execute("varredura 192.0.2.0/24"))
     )
     worker.start()
     assert started.wait(timeout=1)
@@ -174,4 +191,4 @@ def test_cancel_command_stops_active_sweep(
 
     assert "Cancelamento solicitado" in cancel_result.text
     assert not worker.is_alive()
-    assert "Sweep cancelado" in results[0].text
+    assert "Varredura cancelada" in results[0].text

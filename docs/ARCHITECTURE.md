@@ -29,6 +29,12 @@ Marcas identificam o início do prompt e da linha editável; eventos de teclado 
 `TerminalInputModel`, e a GUI renderiza novamente somente a região posterior ao prompt. O conteúdo
 anterior continua selecionável e copiável, mas não pode ser editado.
 
+Cópia e colagem são bindings explícitos da apresentação: `Ctrl+C` copia a seleção sem alterar o
+terminal; toda colagem entra pelo `TerminalInputModel`, mesmo após um clique no histórico. Uma linha
+é aceita sem disparar execução; múltiplas linhas não vazias são rejeitadas sem alterar o rascunho.
+O clipboard funciona com `Ctrl+V` em todas as plataformas; o botão direito usa essa fonte no
+Windows e o botão do meio usa PRIMARY apenas no X11.
+
 Comandos comuns são enviados a um executor sequencial. Comandos marcados como controle no registry
 usam um executor dedicado; hoje apenas `cancelar` tem essa marca. Workers depositam eventos em uma
 fila, verificada periodicamente pela thread do tkinter. Ao receber output, a GUI remove
@@ -51,10 +57,11 @@ na sessão resolve:
 2. comando de contexto explicitamente qualificado, como `icmp ping`;
 3. sugestão por similaridade quando não há correspondência.
 
-O mesmo `CommandSpec` e handler de ping é visível em `root` e `icmp`; não há duplicação.
+O mesmo `CommandSpec` e handler de ping é visível em `root` e `icmp`; o mesmo vale para
+`varredura`, cujo nome anterior `sweep` é apenas alias. Não há duplicação.
 
 `ShellSession.complete` consulta os nomes visíveis do registry. Ele completa comandos e aliases do
-contexto atual e reconhece o segundo token de formas explícitas como `icmp sw`. A GUI apenas aplica
+contexto atual e reconhece o segundo token de formas explícitas como `icmp var`. A GUI apenas aplica
 o resultado ou apresenta múltiplas correspondências; argumentos não são completados.
 
 ### Eventos de execução
@@ -71,6 +78,9 @@ Handlers validam a forma dos argumentos e chamam operações do runtime. `PingEn
 resolve hostname e usa um `PingBackend` injetado. `SweepEngine` valida uma rede IPv4, mantém apenas
 uma janela de até 32 probes ativos e consulta um evento de cancelamento antes de agendar novos
 endereços. Sintaxe e DNS são etapas separadas. Testes usam backends falsos e não dependem de rede.
+O coordenador da `SweepEngine` chama callbacks opcionais quando inicia e quando um future responsivo
+termina. A sessão converte esses callbacks em `OUTPUT`, preservando ordem de descoberta; probes não
+emitem eventos e o resumo final não repete os endereços já apresentados.
 
 ### Plataforma
 
@@ -81,8 +91,8 @@ ainda executa. O encoding vem da localidade do sistema e usa substituição prev
 inválidos. Um timer encerra processos que excedem o limite. Plataformas não suportadas e falhas ao
 iniciar produzem erros próprios.
 
-Para sweep, o mesmo backend executa um único echo por endereço com timeout curto específico da
-plataforma. A sessão aceita somente um sweep ativo, guarda seu `threading.Event` e o sinaliza por
+Para varredura, o mesmo backend executa um único echo por endereço com timeout curto específico da
+plataforma. A sessão aceita somente uma varredura ativa, guarda seu `threading.Event` e o sinaliza por
 `cancelar` ou ao fechar a GUI. Probes já iniciados terminam dentro do timeout; novos não são criados.
 
 ## Decisões atuais
@@ -92,7 +102,9 @@ plataforma. A sessão aceita somente um sweep ativo, guarda seu `threading.Event
 - dispatcher permanece junto da sessão enquanto for pequeno;
 - saída nativa do ping é preservada nesta versão, sem parser frágil por idioma do SO;
 - ping emite a saída nativa incrementalmente e não a duplica no resultado final da GUI;
+- varredura emite início e hosts responsivos incrementalmente e conclui com apenas o resumo;
 - todos os comandos passam pelo executor da GUI, simplificando a garantia de responsividade;
 - histórico e edição da linha atual são modelados sem dependência de widgets, facilitando testes;
-- sweep aceita no máximo 4.096 endereços (`/20`) e não enfileira a rede inteira no executor;
+- a varredura (internamente `SweepEngine`) aceita no máximo 4.096 endereços (`/20`) e não enfileira
+  a rede inteira no executor;
 - versão existe somente em `rabershell.__version__` e o pacote a lê dinamicamente.
