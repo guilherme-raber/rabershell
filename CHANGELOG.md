@@ -6,6 +6,17 @@ baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o proje
 
 ## [Unreleased]
 
+### Removido
+
+- Comando público `ping` e contexto `icmp`, alinhando o catálogo à prioridade por ferramentas que
+  agregam valor além dos utilitários básicos do sistema.
+
+### Alterado
+
+- `varredura` permanece diretamente na raiz, com `sweep` como alias compatível.
+- Autocomplete de `ajuda <comando>` consulta nomes e aliases do registry.
+- Seleções concluídas com o mouse no Windows são copiadas automaticamente para o clipboard.
+
 ### Adicionado
 
 - Fundação do pacote Python, shell especializado e GUI tkinter.

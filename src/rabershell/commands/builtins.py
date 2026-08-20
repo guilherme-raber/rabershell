@@ -40,34 +40,6 @@ def exit_command(
     return CommandResult("Encerrando o rabershell.", action=ResultAction.EXIT)
 
 
-def enter_icmp_command(
-    runtime: CommandRuntime, args: tuple[str, ...], event_sink: EventSink | None
-) -> CommandResult:
-    del event_sink
-    if args:
-        return CommandResult('Uso: icmp [comando]', is_error=True)
-    description = runtime.enter_context("icmp")
-    return CommandResult(
-        f'{description}\nDigite "ajuda" para visualizar os comandos disponíveis.'
-    )
-
-
-def back_command(
-    runtime: CommandRuntime, args: tuple[str, ...], event_sink: EventSink | None
-) -> CommandResult:
-    del event_sink
-    if args:
-        return CommandResult('O comando "voltar" não recebe argumentos.', is_error=True)
-    runtime.leave_context()
-    return CommandResult()
-
-
-def ping_command(
-    runtime: CommandRuntime, args: tuple[str, ...], event_sink: EventSink | None
-) -> CommandResult:
-    return runtime.run_ping(args, event_sink)
-
-
 def sweep_command(
     runtime: CommandRuntime, args: tuple[str, ...], event_sink: EventSink | None
 ) -> CommandResult:

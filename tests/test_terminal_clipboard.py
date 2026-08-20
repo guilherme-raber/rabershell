@@ -34,6 +34,44 @@ def test_copy_selection_preserves_terminal_and_input(window: TerminalWindow) -> 
     assert window._input.text == "rascunho"
 
 
+def test_windows_mouse_release_autocopies_final_selection(
+    window: TerminalWindow,
+) -> None:
+    if window._windowing_system != "win32":
+        pytest.skip("autocopy solicitado somente no Windows")
+    window._input.insert("rascunho")
+    window._render_input()
+    window._terminal.tag_add("sel", "1.0", "1.10")
+    selected = window._terminal.get("sel.first", "sel.last")
+    event: tk.Event[tk.Misc] = tk.Event()
+    event.x = 0
+    event.y = 0
+
+    window._on_mouse_release(event)
+    window._root.update_idletasks()
+
+    assert window._root.clipboard_get() == selected
+    assert window._input.text == "rascunho"
+
+
+def test_windows_click_without_selection_preserves_clipboard(
+    window: TerminalWindow,
+) -> None:
+    if window._windowing_system != "win32":
+        pytest.skip("autocopy solicitado somente no Windows")
+    window._root.clipboard_clear()
+    window._root.clipboard_append("conteúdo anterior")
+    window._terminal.tag_remove("sel", "1.0", "end")
+    event: tk.Event[tk.Misc] = tk.Event()
+    event.x = 0
+    event.y = 0
+
+    window._on_mouse_release(event)
+    window._root.update_idletasks()
+
+    assert window._root.clipboard_get() == "conteúdo anterior"
+
+
 def test_external_paste_after_history_click_only_changes_active_input(
     window: TerminalWindow,
 ) -> None:
@@ -41,34 +79,34 @@ def test_external_paste_after_history_click_only_changes_active_input(
     window._terminal.mark_set("insert", "1.0")
     window._terminal.tag_add("sel", "1.0", "1.10")
     window._root.clipboard_clear()
-    window._root.clipboard_append("ping 1.1.1.1")
+    window._root.clipboard_append("varredura 192.0.2.0/24")
 
     assert window._paste_clipboard() == "break"
 
     assert window._terminal.get("1.0", window._input_start) == protected_before
-    assert window._input.text == "ping 1.1.1.1"
+    assert window._input.text == "varredura 192.0.2.0/24"
     assert window._terminal.index("insert") == window._terminal.index("end-1c")
 
 
 def test_multiline_clipboard_is_rejected_and_preserves_draft(
     window: TerminalWindow,
 ) -> None:
-    window._input.insert("ping 192.")
+    window._input.insert("varredura 192.")
     window._render_input()
     window._root.clipboard_clear()
-    window._root.clipboard_append("ping 1.1.1.1\r\najuda\nversao")
+    window._root.clipboard_append("varredura 192.0.2.0/24\r\najuda\nversao")
 
     window._paste_clipboard()
 
     transcript = window._terminal.get("1.0", "end-1c")
     assert "Colagem com múltiplas linhas não é suportada" in transcript
-    assert window._input.text == "ping 192."
-    assert transcript.endswith("raber> ping 192.")
+    assert window._input.text == "varredura 192."
+    assert transcript.endswith("raber> varredura 192.")
     assert window._session.prompt == "raber>"
 
 
 def test_all_paste_sources_share_multiline_policy(window: TerminalWindow) -> None:
-    for value in ("ping 1.1.1.1\najuda", "varredura 127.0.0.1/32\r\nversao"):
+    for value in ("varredura 192.0.2.0/24\najuda", "sweep 127.0.0.1/32\r\nversao"):
         before = window._input.text
         assert window._paste_value(value) == "break"
         assert window._input.text == before
@@ -87,3 +125,13 @@ def test_streaming_preserves_selected_history_and_current_input(
     assert window._terminal.get("sel.first", "sel.last") == selected
     assert window._input.text == "aju"
     assert window._terminal.get("1.0", "end-1c").endswith("raber> aju")
+
+
+def test_streaming_does_not_trigger_autocopy(window: TerminalWindow) -> None:
+    window._root.clipboard_clear()
+    window._root.clipboard_append("conteúdo anterior")
+    window._terminal.tag_add("sel", "1.0", "1.10")
+
+    window._apply_event(CommandEvent.output("resposta incremental\n"))
+
+    assert window._root.clipboard_get() == "conteúdo anterior"

@@ -14,6 +14,12 @@ consagrados, como ping, ICMP, DNS e TCP, permanecem em inglês.
 Quando houver termo natural e curto, o nome canônico apresentado ao usuário deve ser pt-BR;
 preserve nomes anteriores como aliases quando a compatibilidade exigir.
 
+O rabershell não substitui o shell do sistema nem deve encapsular comandos básicos apenas para
+reproduzi-los. Priorize ferramentas de diagnóstico, análise e operação que agreguem funcionalidade
+ou conveniência significativa além dos utilitários nativos. Exemplos de direção incluem descoberta,
+prefixos/CIDR, diagnósticos compostos, análises avançadas de DNS, ASN/BGP e rotas; não implemente
+esses exemplos sem uma tarefa explícita.
+
 ## Arquitetura e responsabilidades
 
 O fluxo é `GUI -> ShellSession -> parser/registry -> command handler -> engine -> backend de
@@ -38,8 +44,8 @@ Estrutura principal:
 Registre cada comportamento uma única vez em `commands/catalog.py`. `CommandSpec` define nome
 canônico, aliases, contexto, exposição na raiz, ajuda, uso, exemplos e handler. Aliases resolvem
 para o mesmo objeto; nunca crie handlers duplicados. Um comando de contexto pode definir
-`root_exposed=True`. Assim, o único `ping` atende `ping HOST`, `icmp ping HOST` e, após `icmp`,
-`ping HOST`. Contextos pertencem à `ShellSession`, não à GUI.
+`root_exposed=True`. Contextos concretos pertencem à `ShellSession`, não à GUI; atualmente nenhum
+contexto público está registrado. Não crie um contexto quando um comando direto for mais simples.
 
 Operações longas devem oferecer cancelamento cooperativo quando aplicável. A `varredura` (alias
 `sweep`) mantém no máximo uma execução ativa por sessão, usa uma janela limitada de probes
@@ -52,10 +58,15 @@ A GUI usa uma única superfície `Text`. Todo conteúdo anterior ao prompt ativo
 somente o modelo da linha atual pode produzir edições. Autocomplete consulta a sessão/registry, e
 resultados de workers atravessam uma fila consumida pela thread do tkinter. Não atualize widgets a
 partir de threads de execução nem recrie listas paralelas de comandos na camada gráfica.
+O primeiro argumento de `ajuda` é semanticamente um nome de comando e seu autocomplete também deve
+consultar os nomes e aliases visíveis do registry; isso não autoriza autocomplete genérico.
 Seleção do histórico serve apenas para cópia. Toda colagem deve passar pelo modelo da linha atual.
 Uma única linha é aceita sem execução automática; múltiplas linhas não vazias são rejeitadas por
 inteiro, preservando o rascunho. Use fontes nativas somente onde confiáveis: clipboard em todas as
 plataformas, PRIMARY com botão do meio no X11 e botão direito no Windows.
+No Windows, soltar o botão esquerdo após concluir uma seleção não vazia copia o texto para o
+clipboard. Leia a seleção com `after_idle`, depois que o binding do `Text` terminar; clique sem
+seleção não pode sobrescrever o clipboard.
 
 Comandos com saída incremental devem emitir `CommandEvent` pelo callback recebido na execução. A
 ordem é zero ou mais eventos `OUTPUT` seguidos de um único `COMPLETED`; `CommandResult` continua
@@ -74,9 +85,7 @@ isole plataforma em `platform/` e teste com fake.
 
 Nunca use `shell=True`, concatenação de entrada em comando, `eval`, escape para shell ou execução
 fora do catálogo explícito. Valide destinos, redes, portas, quantidades e opções conforme o caso.
-Passe argumentos estruturados ao subprocesso. Validação sintática de hostname e resolução DNS são
-etapas distintas: falha de DNS não transforma hostname sintaticamente válido em entrada inválida.
-Centralize diferenças de plataforma.
+Passe argumentos estruturados ao subprocesso e centralize diferenças de plataforma.
 
 Runtime deve permanecer na biblioteca padrão enquanto ela resolver bem o problema. Antes de nova
 dependência, documente a necessidade e o custo. Ferramentas de desenvolvimento ficam no extra

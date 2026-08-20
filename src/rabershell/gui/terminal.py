@@ -28,6 +28,7 @@ class TerminalWindow:
         self._root.minsize(620, 380)
         self._root.configure(bg="#101418")
         self._root.protocol("WM_DELETE_WINDOW", self._close)
+        self._windowing_system = str(self._root.tk.call("tk", "windowingsystem"))
 
         mono = tkfont.Font(root=self._root, family="Consolas", size=11)
         self._terminal = tk.Text(
@@ -73,11 +74,10 @@ class TerminalWindow:
         self._terminal.bind("<Control-v>", self._paste_clipboard)
         self._terminal.bind("<Control-V>", self._paste_clipboard)
         self._terminal.bind("<<Paste>>", self._paste_clipboard)
-        windowing_system = str(self._root.tk.call("tk", "windowingsystem"))
-        if windowing_system == "x11":
+        if self._windowing_system == "x11":
             self._terminal.bind("<Button-2>", self._paste_primary)
             self._terminal.bind("<ButtonRelease-2>", lambda event: "break")
-        elif windowing_system == "win32":
+        elif self._windowing_system == "win32":
             self._terminal.bind("<Button-3>", self._paste_clipboard)
             self._terminal.bind("<ButtonRelease-3>", lambda event: "break")
         self._terminal.bind("<Control-x>", lambda event: "break")
@@ -127,16 +127,24 @@ class TerminalWindow:
             count = self._terminal.count(self._input_start, index, "chars")
             self._input.cursor = min(len(self._input.text), int(count[0]) if count else 0)
             self._place_cursor()
+        if self._windowing_system == "win32":
+            self._root.after_idle(self._copy_selected_text)
 
     def _copy_selection(self, event: tk.Event[tk.Misc] | None = None) -> str:
         del event
+        self._copy_selected_text()
+        return "break"
+
+    def _copy_selected_text(self) -> bool:
         try:
             value = self._terminal.get("sel.first", "sel.last")
         except tk.TclError:
-            return "break"
+            return False
+        if not value:
+            return False
         self._root.clipboard_clear()
         self._root.clipboard_append(value)
-        return "break"
+        return True
 
     def _paste_clipboard(self, event: tk.Event[tk.Misc] | None = None) -> str:
         del event

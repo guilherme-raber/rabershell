@@ -10,35 +10,31 @@ conjunto explícito de operações validadas, com ajuda contextual, exemplos e m
 Português do Brasil. O princípio de UX é simples: o usuário não deve precisar decorar a
 ferramenta para conseguir usá-la.
 
+O catálogo prioriza diagnósticos e utilitários que agregam valor além dos comandos básicos já
+disponíveis no sistema operacional. O projeto não pretende ser apenas um wrapper desses comandos.
+
 ## Funcionalidades atuais
 
-- shell próprio, contextos, aliases e sugestões de comandos;
-- contexto ICMP e `ping` real para IPv4 ou hostname;
-- saída do `ping` apresentada incrementalmente enquanto o processo está em execução;
+- shell próprio, aliases, sugestões e suporte arquitetural a contextos futuros;
 - `varredura` ICMP concorrente, incremental e cancelável para redes IPv4 de até `/20`
   (`sweep` é alias);
-- `ping` direto, explícito (`icmp ping`) ou dentro do contexto ICMP;
 - terminal tkinter integrado e responsivo, com histórico protegido, ↑/↓ e autocomplete por Tab;
 - backend de sistema isolado e execução sem `shell=True`.
 
 ```text
 raber> ajuda
-raber> ping 8.8.8.8
-raber> icmp ping google.com --quantidade 5
 raber> varredura 192.168.1.0/24
 raber> cancelar
-raber> icmp
-raber/icmp> ping 127.0.0.1
-raber/icmp> voltar
 ```
 
 O prompt, a digitação e a saída compartilham a mesma superfície visual. Use `Tab` para completar
-comandos e aliases, inclusive `icmp <subcomando>`. `Home`, `End`, setas, Backspace e Delete atuam
-somente na linha atual; texto anterior permanece selecionável e pode ser copiado com `Ctrl+C`.
+comandos e aliases. `Home`, `End`, setas, Backspace e Delete atuam somente na linha atual; texto
+anterior permanece selecionável e pode ser copiado com `Ctrl+C`.
 `Ctrl+V` cola uma linha na entrada ativa, sem executar automaticamente. Colagens com múltiplas
 linhas não vazias são rejeitadas integralmente e preservam o rascunho atual.
-No Windows, o botão direito também cola na linha ativa. No X11, o botão do meio cola a seleção
-primária; esses atalhos nunca alteram o histórico protegido.
+No Windows, concluir uma seleção com o mouse já a copia para o clipboard, e o botão direito cola na
+linha ativa. No X11, o botão do meio cola a seleção primária. Esses atalhos nunca alteram o
+histórico protegido. `ajuda <prefixo>` também aceita Tab, por exemplo `ajuda var<Tab>`.
 
 ## Requisitos e instalação
 
@@ -75,8 +71,8 @@ Veja [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) para o fluxo completo, e
 
 ## Roadmap resumido
 
-O próximo ciclo deve amadurecer portabilidade, apresentação do resultado de ping e testes da
-interface. DNS, rotas, TCP, SNMP e diagnósticos compostos são possibilidades futuras, não
+O próximo ciclo deve amadurecer portabilidade, análise de redes/prefixos e testes da interface.
+DNS avançado, rotas, ASN/BGP e diagnósticos compostos são possibilidades futuras, não
 funcionalidades atuais. Consulte [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Uso responsável

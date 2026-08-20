@@ -10,101 +10,72 @@ TerminalWindow (tkinter)
     -> parser
     -> CommandRegistry / resolução
     -> command handler
-    -> PingEngine ou SweepEngine (quando aplicável)
-    -> backend ICMP / sistema operacional
+    -> SweepEngine (quando aplicável)
+    -> backend de probe / sistema operacional
   <- CommandEvent (OUTPUT... COMPLETED)
 ```
 
-`CommandResult` continua trazendo texto, indicação de erro e uma ação estruturada (`CLEAR`, `EXIT`
-ou nenhuma). `CommandEvent` representa output parcial, conclusão ou erro da fronteira assíncrona.
-Isso impede que handlers manipulem widgets e permite reaproveitar sessão e engines em uma futura
-CLI.
+`CommandResult` traz texto, indicação de erro e ação estruturada. `CommandEvent` representa output
+parcial, conclusão ou erro da fronteira assíncrona. A GUI não conhece diagnóstico, engines ou
+subprocessos.
 
 ## Componentes
 
 ### GUI
 
-`TerminalWindow` usa um único widget `Text` para banner, histórico visual, saída, prompt e digitação.
-Marcas identificam o início do prompt e da linha editável; eventos de teclado alteram apenas um
-`TerminalInputModel`, e a GUI renderiza novamente somente a região posterior ao prompt. O conteúdo
-anterior continua selecionável e copiável, mas não pode ser editado.
+`TerminalWindow` usa um único `Text` para banner, histórico, saída, prompt e digitação. Marcas
+protegem todo conteúdo anterior à linha atual; o `TerminalInputModel` é a única fonte de edição.
+Workers depositam eventos em fila thread-safe, consumida exclusivamente pela thread do tkinter. Ao
+chegar output, a GUI preserva seleção, prompt e rascunho.
 
-Cópia e colagem são bindings explícitos da apresentação: `Ctrl+C` copia a seleção sem alterar o
-terminal; toda colagem entra pelo `TerminalInputModel`, mesmo após um clique no histórico. Uma linha
-é aceita sem disparar execução; múltiplas linhas não vazias são rejeitadas sem alterar o rascunho.
-O clipboard funciona com `Ctrl+V` em todas as plataformas; o botão direito usa essa fonte no
-Windows e o botão do meio usa PRIMARY apenas no X11.
+`Ctrl+C` copia sem editar. Toda colagem passa pelo modelo ativo: uma linha é aceita sem execução
+automática e múltiplas linhas não vazias são rejeitadas atomicamente. No Windows, botão direito usa
+o clipboard; no X11, a seleção exportada fica disponível como PRIMARY e o botão do meio a cola.
+No Windows, `<ButtonRelease-1>` agenda a cópia por `after_idle`, permitindo que o binding de classe
+do `Text` finalize a seleção antes da leitura. Seleção vazia não modifica o clipboard.
 
-Comandos comuns são enviados a um executor sequencial. Comandos marcados como controle no registry
-usam um executor dedicado; hoje apenas `cancelar` tem essa marca. Workers depositam eventos em uma
-fila, verificada periodicamente pela thread do tkinter. Ao receber output, a GUI remove
-temporariamente o prompt ativo, insere o chunk e restaura o prompt e o texto ainda em edição. Isso
-evita acesso ao tkinter por workers e mistura entre resultado e entrada durante operações longas.
+### Parser, sessão e contextos
 
-### Parser e sessão
-
-O parser converte a linha em tokens e rejeita aspas incompletas. Não interpreta pipes,
-redirecionamentos ou sintaxe de shell. `ShellSession` possui o contexto (`root` ou `icmp`), produz o
-prompt, resolve invocações e converte falhas conhecidas em mensagens pt-BR.
+O parser tokeniza apenas a gramática interna e rejeita aspas incompletas; não interpreta pipes,
+redirecionamentos ou sintaxe de shell. `ShellSession` mantém prompt, despacho e operação cancelável.
+A infraestrutura genérica de contextos permanece no registry e na sessão para uso futuro, mas
+nenhum contexto público está registrado atualmente.
 
 ### Registry e despacho
 
-`CommandRegistry` é a fonte única para nome canônico, aliases, contexto, exposição na raiz,
-descrição, uso, exemplos e handler. A ajuda é renderizada desses metadados. O dispatcher embutido
-na sessão resolve:
-
-1. comando visível no contexto atual;
-2. comando de contexto explicitamente qualificado, como `icmp ping`;
-3. sugestão por similaridade quando não há correspondência.
-
-O mesmo `CommandSpec` e handler de ping é visível em `root` e `icmp`; o mesmo vale para
-`varredura`, cujo nome anterior `sweep` é apenas alias. Não há duplicação.
-
-`ShellSession.complete` consulta os nomes visíveis do registry. Ele completa comandos e aliases do
-contexto atual e reconhece o segundo token de formas explícitas como `icmp var`. A GUI apenas aplica
-o resultado ou apresenta múltiplas correspondências; argumentos não são completados.
+`CommandRegistry` é a fonte única para nome canônico, aliases, contexto, exposição, descrição, uso,
+exemplos e handler. Ajuda, sugestões e autocomplete derivam desses metadados. `varredura` e seu
+alias `sweep` resolvem para o mesmo `CommandSpec` e handler na raiz.
+O autocomplete normalmente atua no comando. A única regra de argumento atual é `ajuda <comando>`:
+o primeiro argumento consulta os mesmos nomes e aliases visíveis do registry.
 
 ### Eventos de execução
 
-`ShellSession.execute_events` passa um `EventSink` explicitamente pelo handler. Um comando pode
-emitir zero ou mais `OUTPUT`; a sessão emite um único `COMPLETED` com o `CommandResult` ao retornar.
-A mesma thread worker produz os eventos de uma execução, preservando sua ordem. Exceções inesperadas
-capturadas na fronteira da GUI tornam-se `ERROR`. Comandos sem streaming continuam emitindo apenas
-`COMPLETED`.
+`ShellSession.execute_events` passa um `EventSink` ao handler. Um comando emite zero ou mais
+`OUTPUT`, seguido de um único `COMPLETED` com `CommandResult`. Exceções inesperadas capturadas na
+fronteira da GUI tornam-se `ERROR`.
 
-### Commands, core e engines
+O coordenador da `SweepEngine` chama callbacks opcionais ao iniciar e quando um future responsivo
+termina. A sessão os converte em `OUTPUT` em ordem de descoberta. Probes concorrentes não emitem
+eventos diretamente; o resumo final não repete endereços já apresentados.
 
-Handlers validam a forma dos argumentos e chamam operações do runtime. `PingEngine` valida destino,
-resolve hostname e usa um `PingBackend` injetado. `SweepEngine` valida uma rede IPv4, mantém apenas
-uma janela de até 32 probes ativos e consulta um evento de cancelamento antes de agendar novos
-endereços. Sintaxe e DNS são etapas separadas. Testes usam backends falsos e não dependem de rede.
-O coordenador da `SweepEngine` chama callbacks opcionais quando inicia e quando um future responsivo
-termina. A sessão converte esses callbacks em `OUTPUT`, preservando ordem de descoberta; probes não
-emitem eventos e o resumo final não repete os endereços já apresentados.
+### Engine e plataforma
 
-### Plataforma
+`SweepEngine` valida uma rede IPv4, limita a entrada a 4.096 endereços, mantém uma janela de até 32
+probes e consulta um `threading.Event` antes de agendar novos trabalhos. A sessão aceita somente uma
+varredura ativa e `cancelar` sinaliza seu evento cooperativo.
 
-`SystemPingBackend` concentra argumentos específicos: `-n` no Windows e `-c` em Linux/macOS. Para
-ping interativo, abre `Popen` com lista de argumentos, `shell=False`, stdout em pipe e stderr
-redirecionado ao mesmo fluxo. A leitura sequencial linha a linha emite chunks enquanto o processo
-ainda executa. O encoding vem da localidade do sistema e usa substituição previsível para bytes
-inválidos. Um timer encerra processos que excedem o limite. Plataformas não suportadas e falhas ao
-iniciar produzem erros próprios.
+`SystemSweepProbeBackend` concentra os argumentos específicos de Windows, Linux e macOS. Cada probe
+executa um único echo ICMP por `subprocess.run`, com lista estruturada, `shell=False` e timeout. O
+uso interno do utilitário nativo é detalhe do backend; não existe comando público que o exponha como
+wrapper.
 
-Para varredura, o mesmo backend executa um único echo por endereço com timeout curto específico da
-plataforma. A sessão aceita somente uma varredura ativa, guarda seu `threading.Event` e o sinaliza por
-`cancelar` ou ao fechar a GUI. Probes já iniciados terminam dentro do timeout; novos não são criados.
-
-## Decisões atuais
+## Direção e decisões atuais
 
 - layout `src/` reduz imports acidentais da árvore de trabalho;
 - runtime usa apenas biblioteca padrão;
-- dispatcher permanece junto da sessão enquanto for pequeno;
-- saída nativa do ping é preservada nesta versão, sem parser frágil por idioma do SO;
-- ping emite a saída nativa incrementalmente e não a duplica no resultado final da GUI;
-- varredura emite início e hosts responsivos incrementalmente e conclui com apenas o resumo;
-- todos os comandos passam pelo executor da GUI, simplificando a garantia de responsividade;
-- histórico e edição da linha atual são modelados sem dependência de widgets, facilitando testes;
-- a varredura (internamente `SweepEngine`) aceita no máximo 4.096 endereços (`/20`) e não enfileira
-  a rede inteira no executor;
-- versão existe somente em `rabershell.__version__` e o pacote a lê dinamicamente.
+- o catálogo prioriza ferramentas que agregam valor além de comandos básicos do sistema;
+- `ping` não é comando público e não há contexto `icmp`;
+- abstrações genéricas de contexto e eventos permanecem reutilizáveis;
+- operações bloqueantes permanecem fora da thread da GUI;
+- versão existe somente em `rabershell.__version__`.

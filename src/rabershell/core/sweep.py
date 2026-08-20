@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 
-from rabershell.platform.ping_backend import SweepProbeBackend
+from rabershell.platform.sweep_backend import SweepProbeBackend
 
 MAX_SWEEP_ADDRESSES = 4096
 DEFAULT_SWEEP_WORKERS = 32

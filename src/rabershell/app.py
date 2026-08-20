@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from rabershell.commands.catalog import build_registry
-from rabershell.core.ping import PingEngine
 from rabershell.core.sweep import SweepEngine
 from rabershell.gui.terminal import TerminalWindow
-from rabershell.platform.ping_backend import SystemPingBackend
+from rabershell.platform.sweep_backend import SystemSweepProbeBackend
 from rabershell.shell.session import ShellSession
 
 
 def create_session() -> ShellSession:
-    backend = SystemPingBackend()
-    return ShellSession(build_registry(), PingEngine(backend), SweepEngine(backend))
+    backend = SystemSweepProbeBackend()
+    return ShellSession(build_registry(), SweepEngine(backend))
 
 
 def main() -> None:

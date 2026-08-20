@@ -4,18 +4,12 @@ import difflib
 import os.path
 import threading
 
-from rabershell.core.ping import (
-    HostResolutionError,
-    InvalidDestinationError,
-    PingEngine,
-    PingExecutionTimeoutError,
-    PingToolUnavailableError,
-)
 from rabershell.core.sweep import (
     InvalidNetworkError,
     NetworkTooLargeError,
     SweepEngine,
 )
+from rabershell.platform.sweep_backend import SweepToolUnavailableError
 from rabershell.shell.models import (
     CommandEvent,
     CompletionResult,
@@ -30,10 +24,9 @@ from rabershell.shell.registry import CommandRegistry
 
 class ShellSession(CommandRuntime):
     def __init__(
-        self, registry: CommandRegistry, ping_engine: PingEngine, sweep_engine: SweepEngine
+        self, registry: CommandRegistry, sweep_engine: SweepEngine
     ) -> None:
         self.registry = registry
-        self.ping_engine = ping_engine
         self.sweep_engine = sweep_engine
         self._current_context = "root"
         self._operation_lock = threading.Lock()
@@ -97,9 +90,22 @@ class ShellSession(CommandRuntime):
         trailing_space = bool(line) and line[-1].isspace()
         tokens = line.split()
         partial = "" if trailing_space else (tokens[-1] if tokens else "")
+        first_command = (
+            self.registry.resolve(tokens[0], self.current_context) if tokens else None
+        )
+        completing_help_argument = (
+            first_command is not None
+            and first_command.name == "ajuda"
+            and (
+                (len(tokens) == 1 and trailing_space)
+                or (len(tokens) == 2 and not trailing_space)
+            )
+        )
 
         completion_context: str | None = None
-        if self.current_context != "root":
+        if completing_help_argument:
+            completion_context = self.current_context
+        elif self.current_context != "root":
             if len(tokens) <= 1 and not trailing_space:
                 completion_context = self.current_context
             elif not tokens:
@@ -139,8 +145,6 @@ class ShellSession(CommandRuntime):
     def render_help(self, command_name: str | None = None) -> CommandResult:
         if command_name:
             command = self.registry.resolve(command_name, self.current_context)
-            if command is None and self.current_context == "root":
-                command = self.registry.resolve_in_context(command_name, "icmp")
             if command is None:
                 return self._unknown(command_name, self.current_context)
             aliases = f"\nAliases: {', '.join(command.aliases)}" if command.aliases else ""
@@ -158,39 +162,8 @@ class ShellSession(CommandRuntime):
         return CommandResult(
             "Comandos disponíveis:\n\n"
             f"{rows}\n\nDigite \"ajuda <comando>\" para mais informações.\n\n"
-            "Exemplo:\n  ajuda ping"
+            "Exemplo:\n  ajuda varredura"
         )
-
-    def run_ping(
-        self, args: tuple[str, ...], event_sink: EventSink | None = None
-    ) -> CommandResult:
-        parsed = self._parse_ping_arguments(args)
-        if isinstance(parsed, CommandResult):
-            return parsed
-        destination, count = parsed
-        try:
-            on_output = (
-                (lambda text: event_sink(CommandEvent.output(text)))
-                if event_sink is not None
-                else None
-            )
-            report = self.ping_engine.execute(destination, count, on_output=on_output)
-        except (InvalidDestinationError, HostResolutionError) as exc:
-            return CommandResult(str(exc), is_error=True)
-        except (PingToolUnavailableError, PingExecutionTimeoutError) as exc:
-            return CommandResult(f"Não foi possível executar o ping: {exc}", is_error=True)
-        heading = (
-            f'Ping para "{report.destination}" concluído.'
-            if report.successful
-            else f'Não houve resposta bem-sucedida de "{report.destination}".'
-        )
-        if event_sink is not None:
-            return CommandResult(
-                "" if report.successful else heading,
-                is_error=not report.successful,
-            )
-        output = report.output or "A ferramenta ping não produziu saída."
-        return CommandResult(f"{heading}\n\n{output}", is_error=not report.successful)
 
     def run_sweep(
         self, args: tuple[str, ...], event_sink: EventSink | None = None
@@ -231,7 +204,7 @@ class ShellSession(CommandRuntime):
             )
         except (InvalidNetworkError, NetworkTooLargeError) as exc:
             return CommandResult(str(exc), is_error=True)
-        except PingToolUnavailableError as exc:
+        except SweepToolUnavailableError as exc:
             return CommandResult(f"Não foi possível executar a varredura: {exc}", is_error=True)
         finally:
             with self._operation_lock:
@@ -263,24 +236,3 @@ class ShellSession(CommandRuntime):
                 return False
             self._active_cancel_event.set()
             return True
-
-    @staticmethod
-    def _parse_ping_arguments(args: tuple[str, ...]) -> tuple[str, int] | CommandResult:
-        usage = "Uso: ping <destino> [--quantidade N]"
-        if not args:
-            return CommandResult(f"Destino obrigatório.\n\n{usage}", is_error=True)
-        destination = args[0]
-        count = 4
-        remaining = list(args[1:])
-        if remaining:
-            if len(remaining) != 2 or remaining[0] not in {"--quantidade", "--count"}:
-                return CommandResult(usage, is_error=True)
-            try:
-                count = int(remaining[1])
-            except ValueError:
-                return CommandResult(
-                    "A quantidade deve ser um número inteiro entre 1 e 20.", is_error=True
-                )
-            if not 1 <= count <= 20:
-                return CommandResult("A quantidade deve estar entre 1 e 20.", is_error=True)
-        return destination, count

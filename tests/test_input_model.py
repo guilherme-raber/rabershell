@@ -11,15 +11,15 @@ def test_backspace_and_delete_never_cross_input_start() -> None:
 
 def test_home_end_and_editing_stay_inside_current_input() -> None:
     model = TerminalInputModel()
-    model.insert("ping")
+    model.insert("ajuda")
     model.move_home()
     model.backspace()
     model.insert("x")
-    assert model.text == "xping"
+    assert model.text == "xajuda"
     assert model.cursor == 1
     model.move_end()
     model.insert("!")
-    assert model.text == "xping!"
+    assert model.text == "xajuda!"
 
 
 def test_empty_enter_does_not_create_history_entry() -> None:
@@ -31,7 +31,7 @@ def test_empty_enter_does_not_create_history_entry() -> None:
 
 def test_history_navigation_preserves_current_draft() -> None:
     model = TerminalInputModel()
-    model.insert("ping 1.1.1.1")
+    model.insert("varredura 192.0.2.0/24")
     model.submit()
     model.insert("ajuda")
     model.submit()
@@ -40,7 +40,7 @@ def test_history_navigation_preserves_current_draft() -> None:
     model.history_up()
     assert model.text == "ajuda"
     model.history_up()
-    assert model.text == "ping 1.1.1.1"
+    assert model.text == "varredura 192.0.2.0/24"
     model.history_down()
     assert model.text == "ajuda"
     model.history_down()
@@ -49,12 +49,12 @@ def test_history_navigation_preserves_current_draft() -> None:
 
 def test_multiline_paste_is_rejected_without_changing_draft() -> None:
     model = TerminalInputModel()
-    model.insert("ping ")
+    model.insert("varredura ")
     assert not model.paste("1.1.1.1\r\najuda\nversao")
-    assert model.text == "ping "
+    assert model.text == "varredura "
 
 
 def test_single_non_empty_line_with_empty_lines_is_accepted() -> None:
     model = TerminalInputModel()
-    assert model.paste("\r\nping 1.1.1.1\n\n")
-    assert model.text == "ping 1.1.1.1"
+    assert model.paste("\r\nvarredura 192.0.2.0/24\n\n")
+    assert model.text == "varredura 192.0.2.0/24"
